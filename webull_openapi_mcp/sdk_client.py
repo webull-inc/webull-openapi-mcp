@@ -30,7 +30,11 @@ def _2fa_guide_link(region_id: str) -> str:
 
 
 def _supports_unicode() -> bool:
-    """Return True if stdout/stderr can safely render Unicode box-drawing characters."""
+    """Return True if stdout/stderr can safely render Unicode box-drawing characters.
+
+    On Windows with non-UTF-8 codepages (e.g. cp932, cp1252) Unicode
+    box-drawing characters render as garbled text, so we fall back to ASCII.
+    """
     encoding = getattr(sys.stdout, "encoding", None) or ""
     return encoding.lower().replace("-", "") in ("utf8", "utf16", "utf32")
 
