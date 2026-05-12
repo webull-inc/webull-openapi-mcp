@@ -1134,6 +1134,11 @@ def format_futures_products(data: Any) -> str:
     return _format_flat_list(data, "Futures Products")
 
 
+def format_futures_product_classes(data: Any) -> str:
+    """Format futures product classes list."""
+    return _format_flat_list(data, "Futures Product Classes")
+
+
 def format_event_series(data: Any) -> str:
     """Format event series list."""
     return _format_flat_list(data, "Event Series")
@@ -1147,3 +1152,284 @@ def format_event_categories(data: Any) -> str:
 def format_event_events(data: Any) -> str:
     """Format event events list."""
     return _format_flat_list(data, "Event Events")
+
+
+# ---------------------------------------------------------------------------
+# Screener formatters
+# ---------------------------------------------------------------------------
+
+def _format_screener_item(item: dict) -> str:
+    """Format a single screener result item."""
+    lines = [
+        f"  {_get(item, 'symbol')} - {_get(item, 'name')}  (instrument_id: {_get(item, 'instrument_id')})",
+        f"    Price: {_get(item, 'price')}  Pre Close: {_get(item, 'pre_close')}  Open: {_get(item, 'open')}  High: {_get(item, 'high')}  Low: {_get(item, 'low')}  Close: {_get(item, 'close')}",
+        f"    Change: {_get(item, 'change')}  Change Ratio: {_get(item, 'change_ratio')}  Amplitude: {_get(item, 'amplitude')}",
+        f"    Volume: {_get(item, 'volume')}  Turnover: {_get(item, 'turnover')}  Turnover Rate: {_get(item, 'turnover_rate')}  Market Value: {_get(item, 'market_value')}",
+        f"    Exchange: {_get(item, 'exchange_code')}  Currency: {_get(item, 'currency_code')}",
+    ]
+    return "\n".join(lines)
+
+
+def format_gainers_losers(data: Any) -> str:
+    """Format gainers/losers screener response.
+
+    API returns: {hasMore: bool, data: [{instrumentId, symbol, name, price,
+    change, changePercent, volume, marketValue, ...}]}
+    """
+    if not data:
+        return _NO_DATA
+
+    items = data.get("data", []) if isinstance(data, dict) else data
+    if not items:
+        return _NO_DATA
+
+    lines: list[str] = ["=== Gainers / Losers ==="]
+    for item in items:
+        if isinstance(item, dict):
+            lines.append(_format_screener_item(item))
+
+    has_more = data.get("has_more") if isinstance(data, dict) else None
+    if has_more is True:
+        lines.append("\n  (More results available — increase page_size or page_index)")
+
+    return "\n".join(lines)
+
+
+def format_most_active(data: Any) -> str:
+    """Format most active screener response.
+
+    API returns: {hasMore: bool, data: [{instrumentId, symbol, name, price,
+    change, changePercent, volume, marketValue, relativeVolume10d, ...}]}
+    """
+    if not data:
+        return _NO_DATA
+
+    items = data.get("data", []) if isinstance(data, dict) else data
+    if not items:
+        return _NO_DATA
+
+    lines: list[str] = ["=== Most Active ==="]
+    for item in items:
+        if isinstance(item, dict):
+            rel_vol = _get(item, "relative_volume_10d")
+            extra = f"\n    Relative Volume 10d: {rel_vol}" if rel_vol != "N/A" else ""
+            lines.append(_format_screener_item(item) + extra)
+
+    has_more = data.get("has_more") if isinstance(data, dict) else None
+    if has_more is True:
+        lines.append("\n  (More results available — increase page_size or page_index)")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Watchlist formatters
+# ---------------------------------------------------------------------------
+
+def format_watchlist(data: Any) -> str:
+    """Format watchlist list response.
+
+    API returns list: [{watchlist_id, name, sort, create_time, update_time}]
+    """
+    if not data:
+        return _NO_DATA
+
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        return _NO_DATA
+
+    lines: list[str] = ["=== Watchlists ==="]
+    for i, wl in enumerate(data, 1):
+        if not isinstance(wl, dict):
+            continue
+        lines.append(
+            f"  {i}. {_get(wl, 'name'):<20s}  "
+            f"ID: {_get(wl, 'watchlist_id')}  "
+            f"Sort: {_get(wl, 'sort')}  "
+            f"Created: {_get(wl, 'create_time')}  "
+            f"Updated: {_get(wl, 'update_time')}"
+        )
+
+    return "\n".join(lines)
+
+
+def format_watchlist_instruments(data: Any) -> str:
+    """Format watchlist instruments response.
+
+    API returns: {watchlist_id, instruments: [{instrument_id, symbol, name,
+    exchange_code, sort, added_time}]}
+    """
+    if not data:
+        return _NO_DATA
+
+    instruments = data.get("instruments", []) if isinstance(data, dict) else data
+    if not instruments:
+        wid = data.get("watchlist_id", "") if isinstance(data, dict) else ""
+        return f"=== Watchlist Instruments (ID: {wid}) ===\n  No instruments in this watchlist."
+
+    wid = data.get("watchlist_id", "") if isinstance(data, dict) else ""
+    lines: list[str] = [f"=== Watchlist Instruments (ID: {wid}) ==="]
+    for i, inst in enumerate(instruments, 1):
+        if not isinstance(inst, dict):
+            continue
+        lines.append(
+            f"  {i}. {_get(inst, 'symbol'):>8s}  "
+            f"{_get(inst, 'name'):<20s}  "
+            f"ID: {_get(inst, 'instrument_id')}  "
+            f"Exchange: {_get(inst, 'exchange_code')}  "
+            f"Sort: {_get(inst, 'sort')}  "
+            f"Added: {_get(inst, 'added_time')}"
+        )
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Fundamental data formatters
+# ---------------------------------------------------------------------------
+
+def format_company_profile(data: Any) -> str:
+    """Format company profile response.
+
+    API returns: {symbol, category, company_name, establish_date, exhibition_code,
+    profile, employees, address, ceo, industries}
+    """
+    if not data:
+        return _NO_DATA
+    if not isinstance(data, dict):
+        return _NO_DATA
+
+    lines: list[str] = [f"=== Company Profile: {_get(data, 'symbol')} ==="]
+    lines.append(f"  Category:        {_get(data, 'category')}")
+    lines.append(f"  Company Name:    {_get(data, 'company_name')}")
+    lines.append(f"  Exchange:        {_get(data, 'exhibition_code')}")
+    lines.append(f"  CEO:             {_get(data, 'ceo')}")
+    lines.append(f"  Employees:       {_get(data, 'employees')}")
+    lines.append(f"  Established:     {_get(data, 'establish_date')}")
+    lines.append(f"  Address:         {_get(data, 'address')}")
+
+    industries = data.get("industries")
+    if industries:
+        if isinstance(industries, list):
+            lines.append(f"  Industries:      {', '.join(industries)}")
+        else:
+            lines.append(f"  Industries:      {industries}")
+
+    profile = data.get("profile")
+    if profile:
+        lines.append(f"\n  Description:\n    {profile}")
+
+    return "\n".join(lines)
+
+
+def format_analyst_rating(data: Any) -> str:
+    """Format analyst rating response.
+
+    API returns: {symbol, category, number, under_perform, buy, sell,
+    strong_buy, hold, effective_start_date}
+    """
+    if not data:
+        return _NO_DATA
+    if not isinstance(data, dict):
+        return _NO_DATA
+
+    lines: list[str] = [f"=== Analyst Rating: {_get(data, 'symbol')} ==="]
+    lines.append(f"  Category:        {_get(data, 'category')}")
+    lines.append(f"  Total Analysts:  {_get(data, 'number')}")
+    lines.append(f"  Strong Buy:      {_get(data, 'strong_buy')}")
+    lines.append(f"  Buy:             {_get(data, 'buy')}")
+    lines.append(f"  Hold:            {_get(data, 'hold')}")
+    lines.append(f"  Sell:            {_get(data, 'sell')}")
+    lines.append(f"  Under Perform:   {_get(data, 'under_perform')}")
+    lines.append(f"  Effective Since: {_get(data, 'effective_start_date')}")
+
+    return "\n".join(lines)
+
+
+def format_analyst_target_price(data: Any) -> str:
+    """Format analyst target price response.
+
+    API returns: {symbol, category, mean, low, high, median, currency,
+    effective_start_date}
+    """
+    if not data:
+        return _NO_DATA
+    if not isinstance(data, dict):
+        return _NO_DATA
+
+    lines: list[str] = [f"=== Analyst Target Price: {_get(data, 'symbol')} ==="]
+    lines.append(f"  Category:        {_get(data, 'category')}")
+    lines.append(f"  Mean:            {_get(data, 'mean')}")
+    lines.append(f"  Median:          {_get(data, 'median')}")
+    lines.append(f"  High:            {_get(data, 'high')}")
+    lines.append(f"  Low:             {_get(data, 'low')}")
+    lines.append(f"  Currency:        {_get(data, 'currency')}")
+    lines.append(f"  Effective Since: {_get(data, 'effective_start_date')}")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# NOII formatters
+# ---------------------------------------------------------------------------
+
+def format_noii_bars(data: Any) -> str:
+    """Format NOII K-line bars response.
+
+    API returns list: [{instrument_id, symbol, imbalance_time, imbalance_ref_price,
+    imbalance_near_price, imbalance_far_price, imbalance_action_type}]
+    """
+    if not data:
+        return _NO_DATA
+
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        return _NO_DATA
+
+    lines: list[str] = ["=== NOII Bars ==="]
+    for bar in data:
+        if not isinstance(bar, dict):
+            continue
+        lines.append(
+            f"  {_get(bar, 'symbol'):>8s}  "
+            f"ID: {_get(bar, 'instrument_id')}  "
+            f"Time: {_get(bar, 'imbalance_time')}  "
+            f"Ref: {_get(bar, 'imbalance_ref_price'):>10s}  "
+            f"Near: {_get(bar, 'imbalance_near_price'):>10s}  "
+            f"Far: {_get(bar, 'imbalance_far_price'):>10s}  "
+            f"Type: {_get(bar, 'imbalance_action_type')}"
+        )
+
+    return "\n".join(lines)
+
+
+def format_noii_snapshot(data: Any) -> str:
+    """Format NOII snapshot response.
+
+    API returns: {instrument_id, symbol, paired_shares, imbalance_shares,
+    imbalance_side, imbalance_ref_price, imbalance_near_price, imbalance_far_price,
+    imbalance_action_type, imbalance_time, imbalance_var_indicator}
+    """
+    if not data:
+        return _NO_DATA
+
+    if isinstance(data, list):
+        data = data[0] if data else None
+    if not data or not isinstance(data, dict):
+        return _NO_DATA
+
+    lines: list[str] = [f"=== NOII Snapshot: {_get(data, 'symbol')} ==="]
+    lines.append(f"  Instrument ID:   {_get(data, 'instrument_id')}")
+    lines.append(f"  Action Type:     {_get(data, 'imbalance_action_type')}")
+    lines.append(f"  Time:            {_get(data, 'imbalance_time')}")
+    lines.append(f"  Paired Shares:   {_get(data, 'paired_shares')}")
+    lines.append(f"  Imbalance Shares:{_get(data, 'imbalance_shares')}")
+    lines.append(f"  Imbalance Side:  {_get(data, 'imbalance_side')}")
+    lines.append(f"  Ref Price:       {_get(data, 'imbalance_ref_price')}")
+    lines.append(f"  Near Price:      {_get(data, 'imbalance_near_price')}")
+    lines.append(f"  Far Price:       {_get(data, 'imbalance_far_price')}")
+    lines.append(f"  Var Indicator:   {_get(data, 'imbalance_var_indicator')}")
+
+    return "\n".join(lines)

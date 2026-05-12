@@ -1,7 +1,7 @@
 """Instrument query tools for Webull MCP Server.
 
-Provides: get_instruments, get_futures_instruments, get_futures_instruments_by_code,
-          get_futures_products, get_crypto_instruments, get_event_series,
+Provides: get_instruments, get_futures_instruments, get_futures_products,
+          get_futures_product_class, get_crypto_instruments, get_event_series,
           get_event_instruments, get_event_categories, get_event_events.
 """
 
@@ -15,6 +15,7 @@ from webull_openapi_mcp.formatters import (
     format_event_categories,
     format_event_events,
     format_event_series,
+    format_futures_product_classes,
     format_futures_products,
     format_instruments,
     prepend_disclaimer,
@@ -87,24 +88,37 @@ def register_instrument_tools(
             return handle_sdk_exception(e, "get_instruments")
 
     if region_config.supports_futures:
+        # Determine valid futures categories based on region
+        _valid_futures_categories = "US_FUTURES, HK_FUTURES" if region_config.region_id == "hk" else "US_FUTURES"
+
         @mcp.tool(
             description=(
                 "Get futures instrument info.\n"
-                "category: US_FUTURES.\n"
+                f"category: {_valid_futures_categories}.\n"
+                "Two modes: (1) Query by symbols — pass symbols. "
+                "(2) Query by code — pass code.\n"
+                "status: OC (Tradable), CO (Liquidate only), NT (Non-Tradable).\n"
                 "Returns: symbol, name, instrument_type, exchange."
             ),
             annotations={"readOnlyHint": True},
         )
         async def get_futures_instruments(
-            symbols: str,
+            symbols: Optional[str] = None,
+            code: Optional[str] = None,
             category: str = "US_FUTURES",
+            status: Optional[str] = None,
         ) -> str:
             """Get futures instrument information."""
-            audit.log_tool_call("get_futures_instruments", {"symbols": symbols})
+            audit.log_tool_call("get_futures_instruments", {"symbols": symbols, "code": code, "category": category})
             try:
-                sym_list = _split_symbols(symbols)
+                kwargs = _build_kwargs(
+                    {"category": category},
+                    symbols=_split_symbols(symbols) if symbols else None,
+                    code=code,
+                    status=status,
+                )
                 data = extract_response_data(
-                    sdk.data.instrument.get_futures_instrument(symbols=sym_list, category=category)
+                    sdk.data.instrument.get_futures_instrument(**kwargs)
                 )
                 return prepend_disclaimer(format_instruments(data))
             except Exception as e:
@@ -112,47 +126,47 @@ def register_instrument_tools(
 
         @mcp.tool(
             description=(
-                "Get tradable futures contracts by product code (e.g. ES, NQ, CL).\n"
-                "contract_type: MONTHLY (regular month), MAIN (continuous contract).\n"
-                "Returns: symbol, name, instrument_type, exchange."
-            ),
-            annotations={"readOnlyHint": True},
-        )
-        async def get_futures_instruments_by_code(
-            code: str,
-            category: str = "US_FUTURES",
-            contract_type: Optional[str] = None,
-        ) -> str:
-            """Get tradable futures contracts by product code."""
-            audit.log_tool_call("get_futures_instruments_by_code", {"code": code})
-            try:
-                kwargs = _build_kwargs(
-                    {"code": code, "category": category},
-                    contract_type=contract_type,
-                )
-                data = extract_response_data(sdk.data.instrument.get_futures_instrument_by_code(**kwargs))
-                return prepend_disclaimer(format_instruments(data))
-            except Exception as e:
-                return handle_sdk_exception(e, "get_futures_instruments_by_code")
-
-        @mcp.tool(
-            description=(
                 "Get all futures products and product codes.\n"
-                "category: US_FUTURES.\n"
-                "Returns: product_code, name, exchange."
+                f"category: {_valid_futures_categories}.\n"
+                "product_class_id: optional filter by product class.\n"
+                "Returns: name, code, product_class_id, product_class_name, exchange_code."
             ),
             annotations={"readOnlyHint": True},
         )
         async def get_futures_products(
             category: str = "US_FUTURES",
+            product_class_id: Optional[int] = None,
         ) -> str:
             """Get all futures products and their product codes."""
-            audit.log_tool_call("get_futures_products", {})
+            audit.log_tool_call("get_futures_products", {"category": category})
             try:
-                data = extract_response_data(sdk.data.instrument.get_futures_products(category=category))
+                kwargs = _build_kwargs(
+                    {"category": category},
+                    product_class_id=product_class_id,
+                )
+                data = extract_response_data(sdk.data.instrument.get_futures_products(**kwargs))
                 return prepend_disclaimer(format_futures_products(data))
             except Exception as e:
                 return handle_sdk_exception(e, "get_futures_products")
+
+        @mcp.tool(
+            description=(
+                "Get all futures product classification groups.\n"
+                f"category: {_valid_futures_categories}.\n"
+                "Returns: product_class_id, product_class_name."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_futures_product_class(
+            category: str = "US_FUTURES",
+        ) -> str:
+            """Get all futures product classification groups."""
+            audit.log_tool_call("get_futures_product_class", {"category": category})
+            try:
+                data = extract_response_data(sdk.data.instrument.get_futures_product_class(category=category))
+                return prepend_disclaimer(format_futures_product_classes(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_futures_product_class")
 
     if region_config.supports_crypto:
         @mcp.tool(

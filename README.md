@@ -19,6 +19,10 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full disclaimer.
 
 - **Multi-Region Support** — US, HK, and JP regions with region-specific order types, trading sessions, and validation
 - **Market Data** — Real-time snapshots, tick data, quotes (depth), footprint, and OHLCV bars for stocks, futures, crypto, and event contracts
+- **NOII Data** — Net Order Imbalance Indicator bars and snapshots for US stock opening/closing auctions
+- **Screener** — Top gainers/losers and most active stocks ranking
+- **Watchlist** — Create, manage, and query user watchlists and instruments (US, HK)
+- **Fundamental Data** — Company profiles, analyst ratings, and target prices
 - **Trading** — Place, modify, cancel orders for stocks, options, futures, crypto, and event contracts
 - **Combo Orders** — OTO, OCO, OTOCO combo orders (US only)
 - **Option Strategies** — Multi-leg option strategies: vertical, straddle, strangle, butterfly, condor, etc. (US only)
@@ -39,6 +43,23 @@ Here are some prompts you can use with your AI assistant:
 - Get a real-time snapshot for AAPL, MSFT, and GOOGL
 - What's the current bid/ask for TSLA?
 - Show me 1-minute tick data for NVDA
+- Show me the NOII data for AAPL before market open
+
+**Screener**
+- What are today's top gainers?
+- Show me the biggest losers in pre-market
+- What are the most actively traded stocks right now?
+
+**Watchlist**
+- Show me all my watchlists
+- Create a new watchlist called "Tech Stocks"
+- Add AAPL and MSFT to my watchlist
+- What stocks are in my watchlist?
+
+**Fundamental & Analyst**
+- Tell me about NVDA's company profile
+- What do analysts rate AAPL?
+- What's the analyst target price for TSLA?
 
 **Account & Portfolio**
 - What's my account balance and buying power?
@@ -229,10 +250,19 @@ See [.env.example](.env.example) for full configuration template.
 
 | Category | Tools | Region |
 |----------|-------|--------|
-| **Stock** | `get_stock_tick`, `get_stock_snapshot`, `get_stock_quotes`, `get_stock_footprint`, `get_stock_bars`, `get_stock_bars_single` | US, HK, JP |
+| **Stock** | `get_stock_tick`, `get_stock_snapshot`, `get_stock_quotes`, `get_stock_footprint`, `get_stock_bars`, `get_stock_bars_single`, `get_stock_noii_bars`, `get_stock_noii_snapshot` | US, HK, JP |
 | **Futures** | `get_futures_tick`, `get_futures_snapshot`, `get_futures_depth`, `get_futures_bars`, `get_futures_footprint` | US |
 | **Crypto** | `get_crypto_snapshot`, `get_crypto_bars` | US |
 | **Event** | `get_event_tick`, `get_event_snapshot`, `get_event_depth`, `get_event_bars` | US |
+| **Screener** | `get_gainers_losers`, `get_most_active` | US, HK, JP |
+| **Watchlist** | `get_watchlists`, `create_watchlist`, `update_watchlist`, `delete_watchlist`, `get_watchlist_instruments`, `add_watchlist_instruments`, `remove_watchlist_instruments`, `update_watchlist_instruments` | US, HK, JP |
+
+### Fundamental & Instrument
+
+| Category | Tools | Region |
+|----------|-------|--------|
+| **Instrument** | `get_instruments`, `get_futures_instruments`, `get_futures_products`, `get_crypto_instruments`, `get_event_series`, `get_event_instruments`, `get_event_categories`, `get_event_events` | varies |
+| **Fundamental** | `get_company_profile`, `get_analyst_rating`, `get_analyst_target_price` | US, HK, JP |
 
 ### Trading
 
@@ -240,7 +270,6 @@ See [.env.example](.env.example) for full configuration template.
 |----------|-------|--------|
 | **Account** | `get_account_list` | US, HK, JP |
 | **Assets** | `get_account_balance`, `get_account_positions`, `get_account_position_details` (JP only) | US, HK, JP |
-| **Instrument** | `get_instruments`, `get_futures_instruments`, `get_futures_products`, `get_crypto_instruments`, `get_event_series`, `get_event_instruments`, `get_event_categories`, `get_event_events` | varies |
 | **Stock Order** | `place_stock_order`, `preview_stock_order`, `replace_stock_order` | US, HK, JP |
 | **Combo Order** | `place_stock_combo_order` (OTO/OCO/OTOCO) | US |
 | **Option Order** | `place_option_single_order`, `preview_option_order`, `replace_option_order` | US, HK |
@@ -263,11 +292,17 @@ See [.env.example](.env.example) for full configuration template.
 | Combo Orders | Yes | No | No |
 | Option Strategies | Yes | No | No |
 | Algo Orders | Yes | No | No |
+| Screener (Gainers/Losers/Active) | Yes | Yes | Yes |
+| Watchlist | Yes | Yes | Yes |
+| Fundamental (Company/Analyst) | Yes | Yes | Yes |
+| NOII (Auction Imbalance) | Yes | Yes | Yes |
 | Markets | US | US, HK, CN | US, JP |
 | Instrument Categories | US_STOCK, US_ETF | US_STOCK, US_ETF, HK_STOCK, CN_STOCK | US_STOCK, US_ETF |
 | Order Types | LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT, TRAILING_STOP_LOSS, etc. | LIMIT, MARKET, ENHANCED_LIMIT, AT_AUCTION, AT_AUCTION_LIMIT, etc. | JP market: LIMIT, MARKET — US market: LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT |
 | Time-in-Force | DAY, GTC | US market: DAY, GTC, GTD — HK market: DAY, GTC — CN market: DAY | JP market: DAY — US market: DAY, GTC, GTD |
 | JP Order Fields | — | — | `account_tax_type` required (GENERAL or SPECIFIC); `margin_type` (ONE_DAY or INDEFINITE) and `position_intent` optional margin-account-only fields; `close_contracts` optional |
+
+> **Note:** Screener, Fundamental, and NOII currently only support querying US stock data (`US_STOCK` category). Watchlist supports US stocks and HK stocks.
 
 ---
 
@@ -312,7 +347,7 @@ All commands accept `--env-file PATH` to specify a custom `.env` file location (
 - **Review before trading** — Always review order details proposed by the AI before confirming. Use `preview_stock_order` / `preview_option_order` before placing orders.
 - **Use toolset filtering** — Set `WEBULL_TOOLSETS=account,market-data` to disable trading tools entirely if you only need read-only access. Valid toolsets: `account`, `market-data`, `trading`, `instrument`.
 - **Default sandbox** — The server defaults to UAT (sandbox) environment. You must explicitly set `WEBULL_ENVIRONMENT=prod` for live trading.
-- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `2.0.5`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
+- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `2.0.7`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
 
 ---
 
@@ -395,10 +430,13 @@ webull-openapi-mcp/
 │   └── tools/
 │       ├── __init__.py     # Tool registration exports
 │       ├── market_data/
-│       │   ├── stock.py    # Stock market data (snapshot, quotes, bars, tick, footprint)
+│       │   ├── stock.py    # Stock market data (snapshot, quotes, bars, tick, footprint, NOII)
 │       │   ├── futures.py  # Futures market data
 │       │   ├── crypto.py   # Crypto market data
-│       │   └── event.py    # Event contract market data
+│       │   ├── event.py    # Event contract market data
+│       │   ├── screener.py # Gainers/losers, most active rankings
+│       │   ├── watchlist.py# Watchlist CRUD and instrument management
+│       │   └── fundamental.py # Company profile, analyst ratings/target price
 │       └── trading/
 │           ├── account.py       # Account list
 │           ├── assets.py        # Balance, positions

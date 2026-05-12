@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any, Optional
 from webull_openapi_mcp.errors import handle_sdk_exception
 from webull_openapi_mcp.formatters import (
     extract_response_data,
+    format_noii_bars,
+    format_noii_snapshot,
     format_stock_bars,
     format_stock_footprint,
     format_stock_quotes,
@@ -165,8 +167,15 @@ def register_stock_market_data_tools(
         count: int = 200,
         real_time_required: bool = False,
         trading_sessions: Optional[str] = None,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
     ) -> str:
-        """Batch fetch historical OHLCV bar data for multiple stock symbols."""
+        """Batch fetch historical OHLCV bar data for multiple stock symbols.
+
+        Args:
+            start_time: Start timestamp in milliseconds (optional).
+            end_time: End timestamp in milliseconds (optional).
+        """
         audit.log_tool_call("get_stock_bars", {"symbols": symbols})
         try:
             sym_list = [s.strip() for s in symbols.split(",") if s.strip()]
@@ -174,6 +183,8 @@ def register_stock_market_data_tools(
                 {"symbols": sym_list, "category": category, "timespan": timespan, "count": str(count)},
                 real_time_required=real_time_required,
                 trading_sessions=trading_sessions,
+                start_time=start_time,
+                end_time=end_time,
             )
             data = extract_response_data(sdk.data.market_data.get_batch_history_bar(**kwargs))
             return prepend_disclaimer(format_stock_bars(data))
@@ -194,16 +205,86 @@ def register_stock_market_data_tools(
         count: int = 200,
         real_time_required: bool = False,
         trading_sessions: Optional[str] = None,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
     ) -> str:
-        """Fetch historical OHLCV bar data for a single stock symbol."""
+        """Fetch historical OHLCV bar data for a single stock symbol.
+
+        Args:
+            start_time: Start timestamp in milliseconds (optional).
+            end_time: End timestamp in milliseconds (optional).
+        """
         audit.log_tool_call("get_stock_bars_single", {"symbol": symbol})
         try:
             kwargs = _build_kwargs(
                 {"symbol": symbol, "category": category, "timespan": timespan, "count": str(count)},
                 real_time_required=real_time_required,
                 trading_sessions=trading_sessions,
+                start_time=start_time,
+                end_time=end_time,
             )
             data = extract_response_data(sdk.data.market_data.get_history_bar(**kwargs))
             return prepend_disclaimer(format_stock_bars(data))
         except Exception as e:
             return handle_sdk_exception(e, "get_stock_bars_single", config.region_id)
+
+    @mcp.tool(
+        description=(
+            "Get NOII (Net Order Imbalance Indicator) K-line data for a stock. "
+            "NOII is published by NASDAQ before opening and closing auctions. "
+            "Returns: instrument_id, symbol, imbalance_time, imbalance_ref_price, "
+            "imbalance_near_price, imbalance_far_price, imbalance_action_type."
+        ),
+        annotations={"readOnlyHint": True},
+    )
+    async def get_stock_noii_bars(
+        symbol: str,
+        category: str = "US_STOCK",
+        imbalance_action_type: str = "PRE_OPEN",
+    ) -> str:
+        """Get NOII K-line data during opening/closing auctions.
+
+        Args:
+            imbalance_action_type: PRE_OPEN (opening imbalance) or PRE_CLOSE (closing imbalance).
+        """
+        audit.log_tool_call("get_stock_noii_bars", {"symbol": symbol, "imbalance_action_type": imbalance_action_type})
+        try:
+            data = extract_response_data(
+                sdk.data.market_data.get_noii_bars(
+                    symbol=symbol, category=category, imbalance_action_type=imbalance_action_type,
+                )
+            )
+            return prepend_disclaimer(format_noii_bars(data))
+        except Exception as e:
+            return handle_sdk_exception(e, "get_stock_noii_bars", config.region_id)
+
+    @mcp.tool(
+        description=(
+            "Get latest NOII (Net Order Imbalance Indicator) snapshot for a stock. "
+            "Provides real-time supply-demand data during US stock auction phases. "
+            "Opening auction: 9:28-9:30 AM ET; Closing auction: 3:50-4:00 PM ET. "
+            "Returns: instrument_id, paired_shares, imbalance_shares, imbalance_side, "
+            "imbalance_ref_price, imbalance_near_price, imbalance_far_price."
+        ),
+        annotations={"readOnlyHint": True},
+    )
+    async def get_stock_noii_snapshot(
+        symbol: str,
+        category: str = "US_STOCK",
+        imbalance_action_type: str = "PRE_OPEN",
+    ) -> str:
+        """Get latest NOII snapshot during opening/closing auctions.
+
+        Args:
+            imbalance_action_type: PRE_OPEN (opening imbalance) or PRE_CLOSE (closing imbalance).
+        """
+        audit.log_tool_call("get_stock_noii_snapshot", {"symbol": symbol, "imbalance_action_type": imbalance_action_type})
+        try:
+            data = extract_response_data(
+                sdk.data.market_data.get_noii_snapshot(
+                    symbol=symbol, category=category, imbalance_action_type=imbalance_action_type,
+                )
+            )
+            return prepend_disclaimer(format_noii_snapshot(data))
+        except Exception as e:
+            return handle_sdk_exception(e, "get_stock_noii_snapshot", config.region_id)
