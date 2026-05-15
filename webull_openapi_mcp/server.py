@@ -89,6 +89,7 @@ def _register_tools(
     from webull_openapi_mcp.tools import register_stock_market_data_tools
     from webull_openapi_mcp.tools import register_stock_order_tools
     from webull_openapi_mcp.tools import register_option_single_tools
+    from webull_openapi_mcp.tools import register_fundamental_tools
 
     # Account tools
     if _is_toolset_enabled(config, "account"):
@@ -98,10 +99,20 @@ def _register_tools(
     # Instrument tools
     if _is_toolset_enabled(config, "instrument"):
         register_instrument_tools(mcp, sdk, audit, config)
+        # Fundamental data (company profile, analyst ratings)
+        register_fundamental_tools(mcp, sdk, audit, config)
 
     # Market data tools
     if _is_toolset_enabled(config, "market-data"):
         register_stock_market_data_tools(mcp, sdk, audit, config)
+
+        # Screener tools (gainers/losers, most active)
+        from webull_openapi_mcp.tools import register_screener_tools
+        register_screener_tools(mcp, sdk, audit, config)
+
+        # Watchlist tools
+        from webull_openapi_mcp.tools import register_watchlist_tools
+        register_watchlist_tools(mcp, sdk, audit, config)
 
         if region_config.supports_futures:
             from webull_openapi_mcp.tools import register_futures_market_data_tools

@@ -74,7 +74,7 @@ US_REGION_CONFIG = RegionConfig(
 # =============================================================================
 HK_REGION_CONFIG = RegionConfig(
     region_id="hk",
-    supports_futures=False,
+    supports_futures=True,
     supports_crypto=False,
     supports_event_contracts=False,
     supports_combo_orders=False,  # HK does NOT support combo orders
