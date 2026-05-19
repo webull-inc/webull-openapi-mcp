@@ -72,8 +72,8 @@ def register_instrument_tools(
     ) -> str:
         """Get stock/ETF instrument information. Query by symbols or paginate by category."""
         audit.log_tool_call("get_instruments", {"symbols": symbols, "category": category})
-        if region_config.region_id == "jp" and category not in region_config.valid_instrument_categories:
-            return "Validation error: JP region instrument lookup only supports US_STOCK and US_ETF"
+        if region_config.region_id in ("jp", "sg") and category not in region_config.valid_instrument_categories:
+            return f"Validation error: {region_config.region_id.upper()} region instrument lookup only supports US_STOCK and US_ETF"
         try:
             kwargs = _build_kwargs(
                 {"category": category},
