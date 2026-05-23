@@ -5,6 +5,7 @@ Provides fine-grained futures order tools:
 - replace_futures_order: Modify existing futures order
 
 Note: Uses order_v3 SDK API (OrderOperationV3).
+Supports US and HK regions (based on region_config.supports_futures).
 """
 
 from __future__ import annotations
@@ -47,6 +48,13 @@ def _format_order_result(data: dict) -> str:
     return "\n".join(lines)
 
 
+def _get_valid_futures_markets(region_id: str) -> frozenset[str]:
+    """Get valid futures markets for the region."""
+    if region_id == "hk":
+        return frozenset({"US", "HK"})
+    return frozenset({"US"})
+
+
 def _build_futures_order(
     symbol: str,
     side: str,
@@ -56,12 +64,13 @@ def _build_futures_order(
     coid: str,
     limit_price: float | None,
     stop_price: float | None,
+    market: str = "US",
 ) -> dict:
     """Build the futures order dict for the SDK."""
     order: dict = {
         "combo_type": "NORMAL",
         "instrument_type": "FUTURES",
-        "market": "US",
+        "market": market,
         "symbol": symbol,
         "side": side,
         "order_type": order_type,
@@ -84,28 +93,71 @@ def register_futures_order_tools(
     config: ServerConfig,
 ) -> None:
     """Register futures order tools."""
+    from webull_openapi_mcp.region_config import get_region_config
 
-    @mcp.tool(
-        description=(
+    region_config = get_region_config(config.region_id)
+    valid_futures_markets = _get_valid_futures_markets(config.region_id)
+
+    # Generate description dynamically based on region
+    if region_config.region_id == "hk":
+        _valid_markets_str = "US, HK"
+        _place_desc = (
+            "Place a futures order. QTY only.\n"
+            "Account: Futures account. Call get_account_list first.\n"
+            f"market (REQUIRED): {_valid_markets_str}. Use US for US futures (e.g. ES, NQ), HK for HK futures (e.g. HSI, MHI).\n"
+            "order_type: MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT, TRAILING_STOP_LOSS.\n"
+            "Returns: {client_order_id, order_id}"
+        )
+        _replace_desc = (
+            "Modify an existing futures order. "
+            "Market orders: only quantity modifiable. "
+            "Returns: {client_order_id, order_id}"
+        )
+    else:
+        _place_desc = (
             "[US Only] Place a futures order. QTY only.\n"
             "Account: Futures account. Call get_account_list first.\n"
             "order_type: MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT, TRAILING_STOP_LOSS.\n"
             "Returns: {client_order_id, order_id}"
-        ),
-    )
+        )
+        _replace_desc = (
+            "[US Only] Modify an existing futures order. "
+            "Market orders: only quantity modifiable. "
+            "Returns: {client_order_id, order_id}"
+        )
+
+    # HK region: market has no default (required); US region: defaults to "US"
+    _default_market: str | None = None if region_config.region_id == "hk" else "US"
+
+    @mcp.tool(description=_place_desc)
     async def place_futures_order(
         symbol: str,
         side: str,
         order_type: str,
         time_in_force: str,
         quantity: float,
+        market: Optional[str] = _default_market,
         account_id: Optional[str] = None,
         client_order_id: Optional[str] = None,
         limit_price: Optional[float] = None,
         stop_price: Optional[float] = None,
     ) -> str:
         """Place a futures order."""
-        audit.log_tool_call("place_futures_order", {"symbol": symbol, "side": side})
+        audit.log_tool_call("place_futures_order", {"symbol": symbol, "side": side, "market": market})
+
+        # Validate market parameter
+        if market is None:
+            return (
+                f"Validation error: market is required for {config.region_id.upper()} region. "
+                f"Valid values: {', '.join(sorted(valid_futures_markets))}. "
+                "Use US for US futures (e.g. ES, NQ), HK for HK futures (e.g. HSI, MHI)."
+            )
+        market = market.upper()
+        if market not in valid_futures_markets:
+            return (
+                f"Validation error: Invalid market '{market}' for {config.region_id.upper()} region. "
+                f"Valid values: {', '.join(sorted(valid_futures_markets))}"
+            )
 
         # Auto-resolve account_id
         try:
@@ -120,7 +172,7 @@ def register_futures_order_tools(
 
         params: dict = {
             "side": side, "order_type": order_type, "time_in_force": time_in_force,
-            "quantity": quantity, "symbol": symbol,
+            "quantity": quantity, "symbol": symbol, "market": market,
         }
         if limit_price is not None:
             params["limit_price"] = limit_price
@@ -137,6 +189,7 @@ def register_futures_order_tools(
             symbol=symbol, side=side, order_type=order_type,
             time_in_force=time_in_force, quantity=quantity, coid=coid,
             limit_price=limit_price, stop_price=stop_price,
+            market=market,
         )
 
         audit.log_order_attempt(
@@ -161,13 +214,7 @@ def register_futures_order_tools(
             )
             return handle_sdk_exception(e, "place_futures_order")
 
-    @mcp.tool(
-        description=(
-            "[US Only] Modify an existing futures order. "
-            "Market orders: only quantity modifiable. "
-            "Returns: {client_order_id, order_id}"
-        ),
-    )
+    @mcp.tool(description=_replace_desc)
     async def replace_futures_order(
         account_id: str,
         client_order_id: str,

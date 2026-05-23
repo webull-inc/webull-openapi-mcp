@@ -37,6 +37,13 @@ _DISCLAIMER_JP = (
     "取引にはリスクがあります。慎重に判断してください。\n\n"
 )
 
+_DISCLAIMER_SG = (
+    "⚠️ Disclaimer: "
+    "The information provided by this tool is for reference only "
+    "and does not constitute investment advice. "
+    "Trading involves risk; please make decisions carefully.\n\n"
+)
+
 # Default (backward compatibility)
 DISCLAIMER = _DISCLAIMER_US
 
@@ -52,6 +59,8 @@ def set_disclaimer_region(region_id: str) -> None:
         DISCLAIMER = _DISCLAIMER_HK
     elif _current_region == "jp":
         DISCLAIMER = _DISCLAIMER_JP
+    elif _current_region == "sg":
+        DISCLAIMER = _DISCLAIMER_SG
     else:
         DISCLAIMER = _DISCLAIMER_US
 

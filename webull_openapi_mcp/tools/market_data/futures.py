@@ -41,21 +41,49 @@ def register_futures_market_data_tools(
     config: ServerConfig,
 ) -> None:
     """Register futures market data tools."""
+    from webull_openapi_mcp.region_config import get_region_config
+
+    region_config = get_region_config(config.region_id)
+
+    # HK region supports both US_FUTURES and HK_FUTURES, no default — require explicit input.
+    # US region only has US_FUTURES, keep default value.
+    if region_config.region_id == "hk":
+        _valid_categories = "US_FUTURES, HK_FUTURES"
+        _category_note = f"category (REQUIRED): {_valid_categories}."
+    else:
+        _valid_categories = "US_FUTURES"
+        _category_note = f"category: {_valid_categories}."
+
+    # HK region: category has no default (required); US region: defaults to "US_FUTURES"
+    _default_category: str | None = None if region_config.region_id == "hk" else "US_FUTURES"
+
+    def _validate_category(category: str | None) -> str | None:
+        """Validate category, return error message or None."""
+        if category is None:
+            return (
+                f"Validation error: category is required for {config.region_id.upper()} region. "
+                f"Valid values: {_valid_categories}."
+            )
+        return None
 
     @mcp.tool(
         description=(
             "Get futures tick-by-tick trade data. "
+            f"{_category_note} "
             "Returns: time, price, volume, side."
         ),
         annotations={"readOnlyHint": True},
     )
     async def get_futures_tick(
         symbol: str,
-        category: str = "US_FUTURES",
+        category: Optional[str] = _default_category,
         count: int = 200,
     ) -> str:
         """Fetch tick-by-tick trade data for a futures symbol."""
         audit.log_tool_call("get_futures_tick", {"symbol": symbol})
+        err = _validate_category(category)
+        if err:
+            return err
         try:
             kwargs = _build_kwargs(
                 {"symbol": symbol, "category": category},
@@ -69,6 +97,7 @@ def register_futures_market_data_tools(
     @mcp.tool(
         description=(
             "Get futures real-time snapshot. "
+            f"{_category_note} "
             "Returns: symbol, price, change, change_ratio, volume, "
             "open_interest, settle_price, bid, ask."
         ),
@@ -76,10 +105,13 @@ def register_futures_market_data_tools(
     )
     async def get_futures_snapshot(
         symbols: str,
-        category: str = "US_FUTURES",
+        category: Optional[str] = _default_category,
     ) -> str:
         """Fetch real-time futures snapshot for one or more symbols."""
         audit.log_tool_call("get_futures_snapshot", {"symbols": symbols})
+        err = _validate_category(category)
+        if err:
+            return err
         try:
             sym_list = [s.strip() for s in symbols.split(",") if s.strip()]
             data = extract_response_data(
@@ -92,17 +124,21 @@ def register_futures_market_data_tools(
     @mcp.tool(
         description=(
             "Get futures order book depth. "
+            f"{_category_note} "
             "Returns: symbol, bids, asks."
         ),
         annotations={"readOnlyHint": True},
     )
     async def get_futures_depth(
         symbol: str,
-        category: str = "US_FUTURES",
+        category: Optional[str] = _default_category,
         depth: Optional[int] = None,
     ) -> str:
         """Fetch order book depth for a futures symbol."""
         audit.log_tool_call("get_futures_depth", {"symbol": symbol})
+        err = _validate_category(category)
+        if err:
+            return err
         try:
             kwargs = _build_kwargs(
                 {"symbol": symbol, "category": category},
@@ -116,19 +152,23 @@ def register_futures_market_data_tools(
     @mcp.tool(
         description=(
             "Get futures OHLCV bars in batch. "
+            f"{_category_note} "
             "Returns: time, open, high, low, close, volume."
         ),
         annotations={"readOnlyHint": True},
     )
     async def get_futures_bars(
         symbols: str,
-        category: str = "US_FUTURES",
+        category: Optional[str] = _default_category,
         timespan: str = "D",
         count: int = 200,
         real_time_required: bool = False,
     ) -> str:
         """Batch fetch historical OHLCV bar data for multiple futures symbols."""
         audit.log_tool_call("get_futures_bars", {"symbols": symbols})
+        err = _validate_category(category)
+        if err:
+            return err
         try:
             sym_list = [s.strip() for s in symbols.split(",") if s.strip()]
             kwargs = _build_kwargs(
@@ -144,13 +184,14 @@ def register_futures_market_data_tools(
     @mcp.tool(
         description=(
             "Get futures large order footprint (order flow). "
+            f"{_category_note} "
             "Returns: time, trading_session, total, delta, buy_total, sell_total."
         ),
         annotations={"readOnlyHint": True},
     )
     async def get_futures_footprint(
         symbols: str,
-        category: str = "US_FUTURES",
+        category: Optional[str] = _default_category,
         timespan: str = "M1",
         count: int = 200,
         real_time_required: bool = False,
@@ -158,6 +199,9 @@ def register_futures_market_data_tools(
     ) -> str:
         """Fetch footprint (large order) data for futures symbols."""
         audit.log_tool_call("get_futures_footprint", {"symbols": symbols})
+        err = _validate_category(category)
+        if err:
+            return err
         try:
             sym_list = [s.strip() for s in symbols.split(",") if s.strip()]
             kwargs = _build_kwargs(
