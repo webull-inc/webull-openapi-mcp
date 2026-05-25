@@ -28,7 +28,7 @@ def register_screener_tools(
     audit: AuditLogger,
     config: ServerConfig,
 ) -> None:
-    """Register screener market data tools (US only)."""
+    """Register screener market data tools."""
 
     @mcp.tool(
         description=(
