@@ -20,8 +20,10 @@ if TYPE_CHECKING:
 _2FA_GUIDE_LINKS: dict[str, str] = {
     "hk": "https://developer.webull.hk/apis/docs/authentication/token",
     "jp": "https://developer.webull.co.jp/apis/docs/authentication/token",
+    "my": "https://developer.webull.com.my/apis/docs/authentication/token",
     "sg": "https://developer.webull.com.sg/apis/docs/authentication/token",
     "th": "https://developer.webull.co.th/apis/docs/authentication/token",
+    "uk": "https://developer.webull-uk.com/apis/docs/authentication/token",
     "us": "https://developer.webull.com/apis/docs/authentication/token",
 }
 
@@ -134,7 +136,7 @@ class DeviceNotRegisteredError(Exception):
 # based on each request's api_type - no add_endpoint() calls needed.
 UAT_ENDPOINTS: dict = {
     "default_region": "us",
-    "regions": ["us", "hk", "jp", "sg", "th"],
+    "regions": ["us", "hk", "jp", "sg", "th", "my", "uk"],
     "region_mapping": {
         "us": {
             "api": "us-openapi-alb.uat.webullbroker.com",
@@ -160,6 +162,16 @@ UAT_ENDPOINTS: dict = {
             "api": "th-api.uat.webullbroker.com",
             "quotes-api": "data-api.uat.webullbroker.com",
             "events-api": "th-events-api.uat.webullbroker.com",
+        },
+        "my": {
+            "api": "my-api.uat.webullbroker.com",
+            "quotes-api": "data-api.uat.webullbroker.com",
+            "events-api": "my-events-api.uat.webullbroker.com",
+        },
+        "uk": {
+            "api": "uk-api.uat.webullbroker.com",
+            "quotes-api": "data-api.uat.webullbroker.com",
+            "events-api": "uk-events-api.uat.webullbroker.com",
         },
     },
 }

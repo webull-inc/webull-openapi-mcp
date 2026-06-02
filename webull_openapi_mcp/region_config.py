@@ -171,6 +171,56 @@ TH_REGION_CONFIG = RegionConfig(
 
 
 # =============================================================================
+# MY Region Configuration
+# =============================================================================
+MY_REGION_CONFIG = RegionConfig(
+    region_id="my",
+    supports_futures=False,
+    supports_crypto=False,
+    supports_event_contracts=False,
+    supports_combo_orders=False,
+    supports_option_strategies=False,
+    supports_algo_orders=False,
+    valid_order_types=frozenset({
+        "MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"
+    }),
+    valid_time_in_force=frozenset({"DAY", "GTC"}),
+    valid_trading_sessions=frozenset({"NIGHT", "ALL", "CORE", "ALL_DAY"}),
+    valid_combo_types=frozenset({"NORMAL"}),
+    valid_option_strategies=frozenset({"SINGLE"}),
+    valid_market_categories=frozenset({"US"}),
+    valid_order_markets=frozenset({"US"}),
+    valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
+    supports_options=False,
+)
+
+
+# =============================================================================
+# UK Region Configuration
+# =============================================================================
+UK_REGION_CONFIG = RegionConfig(
+    region_id="uk",
+    supports_futures=False,
+    supports_crypto=False,
+    supports_event_contracts=False,
+    supports_combo_orders=False,
+    supports_option_strategies=False,
+    supports_algo_orders=False,
+    valid_order_types=frozenset({
+        "MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"
+    }),
+    valid_time_in_force=frozenset({"DAY", "GTC"}),
+    valid_trading_sessions=frozenset({"NIGHT", "ALL", "CORE", "ALL_DAY"}),
+    valid_combo_types=frozenset({"NORMAL"}),
+    valid_option_strategies=frozenset({"SINGLE"}),
+    valid_market_categories=frozenset({"US"}),
+    valid_order_markets=frozenset({"US"}),
+    valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
+    supports_options=False,
+)
+
+
+# =============================================================================
 # Region Configuration Registry
 # =============================================================================
 REGION_CONFIGS: dict[str, RegionConfig] = {
@@ -179,6 +229,8 @@ REGION_CONFIGS: dict[str, RegionConfig] = {
     "jp": JP_REGION_CONFIG,
     "sg": SG_REGION_CONFIG,
     "th": TH_REGION_CONFIG,
+    "my": MY_REGION_CONFIG,
+    "uk": UK_REGION_CONFIG,
 }
 
 SUPPORTED_REGIONS: frozenset[str] = frozenset(REGION_CONFIGS.keys())
