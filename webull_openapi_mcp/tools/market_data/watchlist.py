@@ -30,7 +30,7 @@ def register_watchlist_tools(
     audit: AuditLogger,
     config: ServerConfig,
 ) -> None:
-    """Register watchlist management tools (US, HK only)."""
+    """Register watchlist management tools."""
 
     @mcp.tool(
         description=(
