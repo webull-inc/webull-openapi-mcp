@@ -21,8 +21,11 @@ from webull_openapi_mcp.tools.market_data.futures import register_futures_market
 from webull_openapi_mcp.tools.market_data.crypto import register_crypto_market_data_tools
 from webull_openapi_mcp.tools.market_data.event import register_event_market_data_tools
 from webull_openapi_mcp.tools.market_data.screener import register_screener_tools
+from webull_openapi_mcp.tools.market_data.screener import register_extended_screener_tools
 from webull_openapi_mcp.tools.market_data.watchlist import register_watchlist_tools
 from webull_openapi_mcp.tools.market_data.fundamental import register_fundamental_tools
+from webull_openapi_mcp.tools.market_data.fundamental import register_extended_fundamental_tools
+from webull_openapi_mcp.tools.market_data.financial import register_financial_tools
 
 __all__ = [
     "register_account_tools",
@@ -42,6 +45,9 @@ __all__ = [
     "register_crypto_market_data_tools",
     "register_event_market_data_tools",
     "register_screener_tools",
+    "register_extended_screener_tools",
     "register_watchlist_tools",
     "register_fundamental_tools",
+    "register_extended_fundamental_tools",
+    "register_financial_tools",
 ]

@@ -90,6 +90,8 @@ def _register_tools(
     from webull_openapi_mcp.tools import register_stock_order_tools
     from webull_openapi_mcp.tools import register_option_single_tools
     from webull_openapi_mcp.tools import register_fundamental_tools
+    from webull_openapi_mcp.tools import register_extended_fundamental_tools
+    from webull_openapi_mcp.tools import register_financial_tools
 
     # Account tools
     if _is_toolset_enabled(config, "account"):
@@ -99,8 +101,12 @@ def _register_tools(
     # Instrument tools
     if _is_toolset_enabled(config, "instrument"):
         register_instrument_tools(mcp, sdk, audit, config)
-        # Fundamental data (company profile, analyst ratings)
+        # Fundamental data (company profile, analyst ratings) — all regions
         register_fundamental_tools(mcp, sdk, audit, config)
+        # Stock & fund fundamentals + financial statements — US / HK / JP only
+        if region_config.supports_fundamentals:
+            register_extended_fundamental_tools(mcp, sdk, audit, config)
+            register_financial_tools(mcp, sdk, audit, config)
 
     # Market data tools
     if _is_toolset_enabled(config, "market-data"):
@@ -109,6 +115,11 @@ def _register_tools(
         # Screener tools (gainers/losers, most active)
         from webull_openapi_mcp.tools import register_screener_tools
         register_screener_tools(mcp, sdk, audit, config)
+
+        # Extended screener (market sectors, high dividend, 52-week high/low) — US / HK / JP only
+        if region_config.supports_fundamentals:
+            from webull_openapi_mcp.tools import register_extended_screener_tools
+            register_extended_screener_tools(mcp, sdk, audit, config)
 
         # Watchlist tools
         from webull_openapi_mcp.tools import register_watchlist_tools

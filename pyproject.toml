@@ -24,7 +24,7 @@ dependencies = [
     "fastmcp==3.0.2",
     "click",
     "python-dotenv",
-    "webull-openapi-python-sdk==2.0.9",
+    "webull-openapi-python-sdk==2.0.12",
 ]
 
 [project.urls]
