@@ -20,9 +20,11 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full disclaimer.
 - **Multi-Region Support** — US, HK, JP, SG, TH, MY, UK, MX, and BR regions with region-specific order types, trading sessions, and validation
 - **Market Data** — Real-time snapshots, tick data, quotes (depth), footprint, and OHLCV bars for stocks, futures, crypto, and event contracts
 - **NOII Data** — Net Order Imbalance Indicator bars and snapshots for US stock opening/closing auctions
-- **Screener** — Top gainers/losers and most active stocks ranking
+- **Screener** — Top gainers/losers, most active, market sectors, high dividend, and 52-week high/low rankings
 - **Watchlist** — Create, manage, and query user watchlists and instruments
 - **Fundamental Data** — Company profiles, analyst ratings, and target prices
+- **Stock & Fund Fundamentals** — Capital flow, SEC filings, earnings/dividend calendar, forecast EPS, industry comparison, and full fund data (rating, performance, allocation, holdings, brief, dividends, splits, net value, files) (US/HK/JP only)
+- **Financial Statements** — Financial alert, indicators, income statement, balance sheet, and cash flow (US/HK/JP only)
 - **Trading** — Place, modify, cancel orders for stocks, options, futures, crypto, and event contracts
 - **Combo Orders** — OTO, OCO, OTOCO combo orders (US only)
 - **Option Strategies** — Multi-leg option strategies: vertical, straddle, strangle, butterfly, condor, etc. (US only)
@@ -49,6 +51,9 @@ Here are some prompts you can use with your AI assistant:
 - What are today's top gainers?
 - Show me the biggest losers in pre-market
 - What are the most actively traded stocks right now?
+- Show me the market sectors overview
+- List high dividend stocks
+- Which stocks are making new 52-week highs?
 
 **Watchlist**
 - Show me all my watchlists
@@ -60,6 +65,16 @@ Here are some prompts you can use with your AI assistant:
 - Tell me about NVDA's company profile
 - What do analysts rate AAPL?
 - What's the analyst target price for TSLA?
+- Show me the capital flow for AAPL
+- Get TSLA's earnings calendar
+- Show NVDA's industry comparison
+- What are QQQ's top holdings and fund performance?
+
+**Financial Statements**
+- Show me AAPL's latest income statement
+- Get TSLA's balance sheet for the last 4 quarters
+- What's NVDA's cash flow statement?
+- Show me the financial indicators for MSFT
 
 **Account & Portfolio**
 - What's my account balance and buying power?
@@ -280,6 +295,7 @@ See [.env.example](.env.example) for full configuration template.
 | **Crypto** | `get_crypto_snapshot`, `get_crypto_bars` | US |
 | **Event** | `get_event_tick`, `get_event_snapshot`, `get_event_depth`, `get_event_bars` | US |
 | **Screener** | `get_gainers_losers`, `get_most_active` | All |
+| **Screener (Sectors/Dividend/52W)** | `get_market_sectors`, `get_market_sectors_detail`, `get_high_dividend`, `get_52_week_high_low` | US, HK, JP |
 | **Watchlist** | `get_watchlists`, `create_watchlist`, `update_watchlist`, `delete_watchlist`, `get_watchlist_instruments`, `add_watchlist_instruments`, `remove_watchlist_instruments`, `update_watchlist_instruments` | All |
 
 ### Fundamental & Instrument
@@ -288,6 +304,9 @@ See [.env.example](.env.example) for full configuration template.
 |----------|-------|--------|
 | **Instrument** | `get_instruments`, `get_futures_instruments`, `get_futures_products`, `get_crypto_instruments`, `get_event_series`, `get_event_instruments`, `get_event_categories`, `get_event_events` | varies |
 | **Fundamental** | `get_company_profile`, `get_analyst_rating`, `get_analyst_target_price` | All |
+| **Stock Fundamentals** | `get_stock_capital_flow`, `get_stock_filings`, `get_stock_earnings_calendar`, `get_stock_dividend_calendar`, `get_stock_forecast_eps`, `get_stock_industry_comparison` | US, HK, JP |
+| **Fund Fundamentals** | `get_fund_rating`, `get_fund_performance`, `get_fund_allocation`, `get_fund_holdings`, `get_fund_brief`, `get_fund_dividends`, `get_fund_splits`, `get_fund_net_value`, `get_fund_files` | US, HK, JP |
+| **Financial Statements** | `get_financial_alert`, `get_financial_indicators`, `get_income_statement`, `get_balance_sheet`, `get_cash_flow` | US, HK, JP |
 
 ### Trading
 
@@ -318,8 +337,11 @@ See [.env.example](.env.example) for full configuration template.
 | Option Strategies | Yes | No | No | No | No | No | No | No | No |
 | Algo Orders | Yes | No | No | No | No | No | No | No | No |
 | Screener (Gainers/Losers/Active) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Screener (Sectors/Dividend/52W) | Yes | Yes | Yes | No | No | No | No | No | No |
 | Watchlist | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Fundamental (Company/Analyst) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Stock/Fund Fundamentals | Yes | Yes | Yes | No | No | No | No | No | No |
+| Financial Statements | Yes | Yes | Yes | No | No | No | No | No | No |
 | NOII (Auction Imbalance) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Markets | US | US, HK, CN | US, JP | US | US | US | US | US | US |
 | Instrument Categories | US_STOCK, US_ETF | US_STOCK, US_ETF, HK_STOCK, CN_STOCK | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF |
@@ -328,7 +350,7 @@ See [.env.example](.env.example) for full configuration template.
 | Trading Sessions | ALL, CORE, NIGHT | CORE, ALL_DAY, NIGHT, ALL | CORE, ALL, NIGHT, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY |
 | JP Order Fields | — | — | `account_tax_type` required (GENERAL or SPECIFIC); `margin_type` (ONE_DAY or INDEFINITE) and `position_intent` optional margin-account-only fields; `close_contracts` optional | — | — | — | — | — | — |
 
-> **Note:** Screener, Fundamental, and NOII currently only support querying US stock data (`US_STOCK` category). Watchlist supports US stocks and HK stocks.
+> **Note:** Screener (Gainers/Losers/Active), Fundamental (Company/Analyst), and NOII currently only support querying US stock data (`US_STOCK` category). Stock/Fund Fundamentals, Financial Statements, and the extended Screener (Sectors/Dividend/52W) are available in US, HK, and JP regions; supported `category` values vary by endpoint (commonly `US_STOCK`, `HK_STOCK`, `CN_STOCK`, `JP_STOCK`). Watchlist supports US stocks and HK stocks.
 
 ---
 
@@ -373,7 +395,7 @@ All commands accept `--env-file PATH` to specify a custom `.env` file location (
 - **Review before trading** — Always review order details proposed by the AI before confirming. Use `preview_stock_order` / `preview_option_order` before placing orders.
 - **Use toolset filtering** — Set `WEBULL_TOOLSETS=account,market-data` to disable trading tools entirely if you only need read-only access. Valid toolsets: `account`, `market-data`, `trading`, `instrument`.
 - **Default sandbox** — The server defaults to UAT (sandbox) environment. You must explicitly set `WEBULL_ENVIRONMENT=prod` for live trading.
-- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `2.0.9`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
+- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `2.0.12`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
 
 ---
 
@@ -466,9 +488,10 @@ webull-openapi-mcp/
 │       │   ├── futures.py  # Futures market data
 │       │   ├── crypto.py   # Crypto market data
 │       │   ├── event.py    # Event contract market data
-│       │   ├── screener.py # Gainers/losers, most active rankings
+│       │   ├── screener.py # Gainers/losers, most active, market sectors, high dividend, 52-week high/low
 │       │   ├── watchlist.py# Watchlist CRUD and instrument management
-│       │   └── fundamental.py # Company profile, analyst ratings/target price
+│       │   ├── fundamental.py # Company profile, analyst data; stock & fund fundamentals (US/HK/JP)
+│       │   └── financial.py   # Financial statements: alert, indicators, income, balance sheet, cash flow (US/HK/JP)
 │       └── trading/
 │           ├── account.py       # Account list
 │           ├── assets.py        # Balance, positions
