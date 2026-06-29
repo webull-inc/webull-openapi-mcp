@@ -1,6 +1,6 @@
 """Region-specific configuration for Webull MCP Server.
 
-Defines region configurations for US, HK, JP, SG, TH, MY, UK, MX, and BR markets with:
+Defines region configurations for US, HK, JP, SG, TH, MY, UK, MX, BR, EU, ZA, and AU markets with:
 - Feature flags (futures, crypto, event contracts, etc.)
 - Valid enum sets for order types, time-in-force, trading sessions, etc.
 
@@ -278,6 +278,81 @@ BR_REGION_CONFIG = RegionConfig(
 
 
 # =============================================================================
+# EU Region Configuration
+# =============================================================================
+EU_REGION_CONFIG = RegionConfig(
+    region_id="eu",
+    supports_futures=False,
+    supports_crypto=False,
+    supports_event_contracts=False,
+    supports_combo_orders=False,
+    supports_option_strategies=False,
+    supports_algo_orders=False,
+    valid_order_types=frozenset({
+        "MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"
+    }),
+    valid_time_in_force=frozenset({"DAY", "GTC"}),
+    valid_trading_sessions=frozenset({"NIGHT", "ALL", "CORE", "ALL_DAY"}),
+    valid_combo_types=frozenset({"NORMAL"}),
+    valid_option_strategies=frozenset({"SINGLE"}),
+    valid_market_categories=frozenset({"US"}),
+    valid_order_markets=frozenset({"US"}),
+    valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
+    supports_options=False,
+)
+
+
+# =============================================================================
+# ZA Region Configuration
+# =============================================================================
+ZA_REGION_CONFIG = RegionConfig(
+    region_id="za",
+    supports_futures=False,
+    supports_crypto=False,
+    supports_event_contracts=False,
+    supports_combo_orders=False,
+    supports_option_strategies=False,
+    supports_algo_orders=False,
+    valid_order_types=frozenset({
+        "MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"
+    }),
+    valid_time_in_force=frozenset({"DAY", "GTC"}),
+    valid_trading_sessions=frozenset({"NIGHT", "ALL", "CORE", "ALL_DAY"}),
+    valid_combo_types=frozenset({"NORMAL"}),
+    valid_option_strategies=frozenset({"SINGLE"}),
+    valid_market_categories=frozenset({"US"}),
+    valid_order_markets=frozenset({"US"}),
+    valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
+    supports_options=False,
+)
+
+
+# =============================================================================
+# AU Region Configuration
+# =============================================================================
+AU_REGION_CONFIG = RegionConfig(
+    region_id="au",
+    supports_futures=False,
+    supports_crypto=False,
+    supports_event_contracts=False,
+    supports_combo_orders=False,
+    supports_option_strategies=False,
+    supports_algo_orders=False,
+    valid_order_types=frozenset({
+        "MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"
+    }),
+    valid_time_in_force=frozenset({"DAY", "GTC"}),
+    valid_trading_sessions=frozenset({"NIGHT", "ALL", "CORE", "ALL_DAY"}),
+    valid_combo_types=frozenset({"NORMAL"}),
+    valid_option_strategies=frozenset({"SINGLE"}),
+    valid_market_categories=frozenset({"US"}),
+    valid_order_markets=frozenset({"US"}),
+    valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
+    supports_options=False,
+)
+
+
+# =============================================================================
 # Region Configuration Registry
 # =============================================================================
 REGION_CONFIGS: dict[str, RegionConfig] = {
@@ -290,6 +365,9 @@ REGION_CONFIGS: dict[str, RegionConfig] = {
     "uk": UK_REGION_CONFIG,
     "mx": MX_REGION_CONFIG,
     "br": BR_REGION_CONFIG,
+    "eu": EU_REGION_CONFIG,
+    "za": ZA_REGION_CONFIG,
+    "au": AU_REGION_CONFIG,
 }
 
 SUPPORTED_REGIONS: frozenset[str] = frozenset(REGION_CONFIGS.keys())
