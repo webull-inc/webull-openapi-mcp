@@ -98,6 +98,11 @@ MARKET_DATA_TOOLS = frozenset({
 
 # Region-specific subscription guidance
 MARKET_DATA_SUBSCRIPTION_HINTS: dict[str, str] = {
+    "br": (
+        "Market data requires quotes subscription.\n"
+        "Subscribe at: https://www.webull.com.br/quote\n"
+        "Guide: https://developer.webull.com.br/apis/docs/market-data-api/subscribe-quotes"
+    ),
     "hk": (
         "Market data requires quotes subscription.\n"
         "Subscribe at: https://www.webullapp.hk/quote\n"
@@ -107,6 +112,11 @@ MARKET_DATA_SUBSCRIPTION_HINTS: dict[str, str] = {
         "Market data requires quotes subscription.\n"
         "Subscribe at: https://www.webull.co.jp/pricing\n"
         "Guide: https://developer.webull.co.jp/api-doc/market-data/subscribe-quotes/"
+    ),
+    "mx": (
+        "Market data requires quotes subscription.\n"
+        "Subscribe at: https://www.webull.com.mx/quote\n"
+        "Guide: https://developer.webull.com.mx/apis/docs/market-data-api/subscribe-quotes"
     ),
     "us": (
         "Market data requires quotes subscription.\n"

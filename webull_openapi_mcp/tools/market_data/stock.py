@@ -73,7 +73,8 @@ def register_stock_market_data_tools(
         description=(
             "Get real-time stock/ETF snapshot. Supports multiple symbols. "
             "Returns: symbol, price, pre_close, open, high, low, close, volume, "
-            "change, change_ratio, bid, ask, extend_hour, overnight data."
+            "change, change_ratio, bid, ask, turnover, eps, eps_ttm, lot_size, bps, "
+            "extend_hour, overnight data."
         ),
         annotations={"readOnlyHint": True},
     )

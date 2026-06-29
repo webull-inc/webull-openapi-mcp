@@ -152,7 +152,7 @@ WEBULL_APP_SECRET={app_secret}
 # API environment: uat or prod (default: uat)
 WEBULL_ENVIRONMENT={environment}
 
-# Optional: Region ID (default: us). Supported: us, hk, jp
+# Optional: Region ID (default: us). Supported: us, hk, jp, sg, th, my, uk, mx, br
 # WEBULL_REGION_ID=us
 
 # Optional: Risk control parameters

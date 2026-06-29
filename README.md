@@ -17,7 +17,7 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full disclaimer.
 
 ## Features
 
-- **Multi-Region Support** — US, HK, JP, SG, TH, MY, and UK regions with region-specific order types, trading sessions, and validation
+- **Multi-Region Support** — US, HK, JP, SG, TH, MY, UK, MX, and BR regions with region-specific order types, trading sessions, and validation
 - **Market Data** — Real-time snapshots, tick data, quotes (depth), footprint, and OHLCV bars for stocks, futures, crypto, and event contracts
 - **NOII Data** — Net Order Imbalance Indicator bars and snapshots for US stock opening/closing auctions
 - **Screener** — Top gainers/losers and most active stocks ranking
@@ -96,6 +96,8 @@ Here are some prompts you can use with your AI assistant:
    - TH: [developer.webull.co.th](https://developer.webull.co.th/apis/home)
    - MY: [developer.webull.com.my](https://developer.webull.com.my/apis/home)
    - UK: [developer.webull-uk.com](https://developer.webull-uk.com/apis/home)
+   - MX: [developer.webull.com.mx](https://developer.webull.com.mx/apis/home)
+   - BR: [developer.webull.com.br](https://developer.webull.com.br/apis/home)
 2. **API Credentials** — Obtain your `App Key` and `App Secret`
 3. **Market Data Subscription** — Subscribe to quotes for market data access:
    - US: [webullapp.com/quote](https://www.webullapp.com/quote) | [Guide](https://developer.webull.com/apis/docs/market-data-api/subscribe-quotes)
@@ -105,6 +107,8 @@ Here are some prompts you can use with your AI assistant:
    - TH: [webull.co.th/quote](https://www.webull.co.th/quote) | [Guide](https://developer.webull.co.th/apis/docs/market-data-api/subscribe-quotes)
    - MY: [webull.com.my/quote](https://www.webull.com.my/quote) | [Guide](https://developer.webull.com.my/apis/docs/market-data-api/subscribe-quotes)
    - UK: [webull-uk.com/quote](https://www.webull-uk.com/quote) | [Guide](https://developer.webull-uk.com/apis/docs/market-data-api/subscribe-quotes)
+   - MX: [webull.com.mx/quote](https://www.webull.com.mx/quote) | [Guide](https://developer.webull.com.mx/apis/docs/market-data-api/subscribe-quotes)
+   - BR: [webull.com.br/quote](https://www.webull.com.br/quote) | [Guide](https://developer.webull.com.br/apis/docs/market-data-api/subscribe-quotes)
 4. **Python 3.10+**
 5. **uv** (recommended) — [Install guide](https://docs.astral.sh/uv/getting-started/installation/)
 
@@ -247,7 +251,7 @@ Add to your MCP configuration:
 | `WEBULL_APP_KEY` | App Key (required) | — |
 | `WEBULL_APP_SECRET` | App Secret (required) | — |
 | `WEBULL_ENVIRONMENT` | `uat` (sandbox) or `prod` | `uat` |
-| `WEBULL_REGION_ID` | `us`, `hk`, `jp`, `sg`, `th`, `my`, or `uk` | `us` |
+| `WEBULL_REGION_ID` | `us`, `hk`, `jp`, `sg`, `th`, `my`, `uk`, `mx`, or `br` | `us` |
 | `WEBULL_TOOLSETS` | Enabled tool categories (comma-separated). Valid values: `account`, `market-data`, `trading`, `instrument` | (all enabled) |
 | `WEBULL_MAX_ORDER_NOTIONAL_USD` | Max order value for US market (USD) | `10000` |
 | `WEBULL_MAX_ORDER_NOTIONAL_HKD` | Max order value for HK market (HKD) | `80000` |
@@ -259,7 +263,7 @@ Add to your MCP configuration:
 | `WEBULL_AUDIT_LOG_FILE` | Audit log file path | stderr only |
 | `WEBULL_LOG_LEVEL` | SDK log level | `WARNING` |
 
-> **Note:** `WEBULL_REGION_ID=us` represents **Webull US** ([developer.webull.com](https://developer.webull.com/apis/home)), `WEBULL_REGION_ID=hk` represents **Webull Hong Kong** ([developer.webull.hk](https://developer.webull.hk/apis/home)), `WEBULL_REGION_ID=jp` represents **Webull Japan** ([developer.webull.co.jp](https://developer.webull.co.jp/)), `WEBULL_REGION_ID=sg` represents **Webull Singapore** ([developer.webull.com.sg](https://developer.webull.com.sg/apis/home)), `WEBULL_REGION_ID=th` represents **Webull Thailand** ([developer.webull.co.th](https://developer.webull.co.th/apis/home)), `WEBULL_REGION_ID=my` represents **Webull Malaysia** ([developer.webull.com.my](https://developer.webull.com.my/apis/home)), and `WEBULL_REGION_ID=uk` represents **Webull UK** ([developer.webull-uk.com](https://developer.webull-uk.com/apis/home)).
+> **Note:** `WEBULL_REGION_ID=us` represents **Webull US** ([developer.webull.com](https://developer.webull.com/apis/home)), `WEBULL_REGION_ID=hk` represents **Webull Hong Kong** ([developer.webull.hk](https://developer.webull.hk/apis/home)), `WEBULL_REGION_ID=jp` represents **Webull Japan** ([developer.webull.co.jp](https://developer.webull.co.jp/)), `WEBULL_REGION_ID=sg` represents **Webull Singapore** ([developer.webull.com.sg](https://developer.webull.com.sg/apis/home)), `WEBULL_REGION_ID=th` represents **Webull Thailand** ([developer.webull.co.th](https://developer.webull.co.th/apis/home)), `WEBULL_REGION_ID=my` represents **Webull Malaysia** ([developer.webull.com.my](https://developer.webull.com.my/apis/home)), `WEBULL_REGION_ID=uk` represents **Webull UK** ([developer.webull-uk.com](https://developer.webull-uk.com/apis/home)), `WEBULL_REGION_ID=mx` represents **Webull Mexico** ([developer.webull.com.mx](https://developer.webull.com.mx/apis/home)), and `WEBULL_REGION_ID=br` represents **Webull Brazil** ([developer.webull.com.br](https://developer.webull.com.br/apis/home)).
 
 See [.env.example](.env.example) for full configuration template.
 
@@ -303,26 +307,26 @@ See [.env.example](.env.example) for full configuration template.
 
 ### Region Differences
 
-| Feature | US | HK | JP | SG | TH | MY | UK |
-|---------|----|----|----|----|----|----|-----|
-| Stock Trading | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Option Trading | Yes | Yes | No | No | No | No | No |
-| Futures Trading | Yes | Yes | No | No | No | No | No |
-| Crypto Trading | Yes | No | No | No | No | No | No |
-| Event Contracts | Yes | No | No | No | No | No | No |
-| Combo Orders | Yes | No | No | No | No | No | No |
-| Option Strategies | Yes | No | No | No | No | No | No |
-| Algo Orders | Yes | No | No | No | No | No | No |
-| Screener (Gainers/Losers/Active) | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Watchlist | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Fundamental (Company/Analyst) | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| NOII (Auction Imbalance) | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Markets | US | US, HK, CN | US, JP | US | US | US | US |
-| Instrument Categories | US_STOCK, US_ETF | US_STOCK, US_ETF, HK_STOCK, CN_STOCK | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF |
-| Order Types | LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT, TRAILING_STOP_LOSS, etc. | LIMIT, MARKET, ENHANCED_LIMIT, AT_AUCTION, AT_AUCTION_LIMIT, etc. | JP market: LIMIT, MARKET — US market: LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT |
-| Time-in-Force | DAY, GTC | US market: DAY, GTC, GTD — HK market: DAY, GTC — CN market: DAY | JP market: DAY — US market: DAY, GTC, GTD | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC |
-| Trading Sessions | ALL, CORE, NIGHT | CORE, ALL_DAY, NIGHT, ALL | CORE, ALL, NIGHT, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY |
-| JP Order Fields | — | — | `account_tax_type` required (GENERAL or SPECIFIC); `margin_type` (ONE_DAY or INDEFINITE) and `position_intent` optional margin-account-only fields; `close_contracts` optional | — | — | — | — |
+| Feature | US | HK | JP | SG | TH | MY | UK | MX | BR |
+|---------|----|----|----|----|----|----|-----|----|----|
+| Stock Trading | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Option Trading | Yes | Yes | No | No | No | No | No | No | No |
+| Futures Trading | Yes | Yes | No | No | No | No | No | No | No |
+| Crypto Trading | Yes | No | No | No | No | No | No | No | No |
+| Event Contracts | Yes | No | No | No | No | No | No | No | No |
+| Combo Orders | Yes | No | No | No | No | No | No | No | No |
+| Option Strategies | Yes | No | No | No | No | No | No | No | No |
+| Algo Orders | Yes | No | No | No | No | No | No | No | No |
+| Screener (Gainers/Losers/Active) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Watchlist | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Fundamental (Company/Analyst) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| NOII (Auction Imbalance) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Markets | US | US, HK, CN | US, JP | US | US | US | US | US | US |
+| Instrument Categories | US_STOCK, US_ETF | US_STOCK, US_ETF, HK_STOCK, CN_STOCK | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF |
+| Order Types | LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT, TRAILING_STOP_LOSS, etc. | LIMIT, MARKET, ENHANCED_LIMIT, AT_AUCTION, AT_AUCTION_LIMIT, etc. | JP market: LIMIT, MARKET — US market: LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT |
+| Time-in-Force | DAY, GTC | US market: DAY, GTC, GTD — HK market: DAY, GTC — CN market: DAY | JP market: DAY — US market: DAY, GTC, GTD | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC |
+| Trading Sessions | ALL, CORE, NIGHT | CORE, ALL_DAY, NIGHT, ALL | CORE, ALL, NIGHT, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY |
+| JP Order Fields | — | — | `account_tax_type` required (GENERAL or SPECIFIC); `margin_type` (ONE_DAY or INDEFINITE) and `position_intent` optional margin-account-only fields; `close_contracts` optional | — | — | — | — | — | — |
 
 > **Note:** Screener, Fundamental, and NOII currently only support querying US stock data (`US_STOCK` category). Watchlist supports US stocks and HK stocks.
 
@@ -413,6 +417,8 @@ Subscribe to quotes:
 - TH: [webull.co.th/quote](https://www.webull.co.th/quote) | [Guide](https://developer.webull.co.th/apis/docs/market-data-api/subscribe-quotes)
 - MY: [webull.com.my/quote](https://www.webull.com.my/quote) | [Guide](https://developer.webull.com.my/apis/docs/market-data-api/subscribe-quotes)
 - UK: [webull-uk.com/quote](https://www.webull-uk.com/quote) | [Guide](https://developer.webull-uk.com/apis/docs/market-data-api/subscribe-quotes)
+- MX: [webull.com.mx/quote](https://www.webull.com.mx/quote) | [Guide](https://developer.webull.com.mx/apis/docs/market-data-api/subscribe-quotes)
+- BR: [webull.com.br/quote](https://www.webull.com.br/quote) | [Guide](https://developer.webull.com.br/apis/docs/market-data-api/subscribe-quotes)
 
 ### Token Expired
 
@@ -447,7 +453,7 @@ webull-openapi-mcp/
 │   ├── server.py           # MCP server setup and tool registration
 │   ├── sdk_client.py       # Webull SDK adapter (ApiClient, TradeClient, DataClient)
 │   ├── config.py           # Configuration loading and validation
-│   ├── region_config.py    # Region-specific settings (US, HK, JP, SG, TH, MY, UK)
+│   ├── region_config.py    # Region-specific settings (US, HK, JP, SG, TH, MY, UK, MX, BR)
 │   ├── guards.py           # Order validation (price, quantity, notional, region rules)
 │   ├── audit.py            # Audit logging for order operations
 │   ├── errors.py           # Exception definitions and SDK error handling

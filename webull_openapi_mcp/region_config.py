@@ -1,6 +1,6 @@
 """Region-specific configuration for Webull MCP Server.
 
-Defines region configurations for US, HK, and JP markets with:
+Defines region configurations for US, HK, JP, SG, TH, MY, UK, MX, and BR markets with:
 - Feature flags (futures, crypto, event contracts, etc.)
 - Valid enum sets for order types, time-in-force, trading sessions, etc.
 
@@ -36,6 +36,10 @@ class RegionConfig:
     valid_order_markets: frozenset[str]
     valid_instrument_categories: frozenset[str]
     supports_options: bool = True
+    # Fundamentals / financials / extended screener tools (capital flow, SEC filings,
+    # earnings & dividend calendars, fund data, financial statements, market sectors,
+    # high dividend, 52-week high/low). Currently only US / HK / JP markets.
+    supports_fundamentals: bool = False
 
 
 # =============================================================================
@@ -66,6 +70,7 @@ US_REGION_CONFIG = RegionConfig(
     valid_market_categories=frozenset({"US_STOCK", "US_ETF"}),
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
+    supports_fundamentals=True,
 )
 
 
@@ -91,6 +96,7 @@ HK_REGION_CONFIG = RegionConfig(
     valid_market_categories=frozenset({"US", "HK", "CN"}),
     valid_order_markets=frozenset({"US", "HK", "CN"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF", "HK_STOCK", "CN_STOCK"}),
+    supports_fundamentals=True,
 )
 
 
@@ -117,6 +123,7 @@ JP_REGION_CONFIG = RegionConfig(
     # JP instrument API currently supports US stock / ETF categories only.
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    supports_fundamentals=True,
 )
 
 
@@ -221,6 +228,56 @@ UK_REGION_CONFIG = RegionConfig(
 
 
 # =============================================================================
+# MX Region Configuration
+# =============================================================================
+MX_REGION_CONFIG = RegionConfig(
+    region_id="mx",
+    supports_futures=False,
+    supports_crypto=False,
+    supports_event_contracts=False,
+    supports_combo_orders=False,
+    supports_option_strategies=False,
+    supports_algo_orders=False,
+    valid_order_types=frozenset({
+        "MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"
+    }),
+    valid_time_in_force=frozenset({"DAY", "GTC"}),
+    valid_trading_sessions=frozenset({"NIGHT", "ALL", "CORE", "ALL_DAY"}),
+    valid_combo_types=frozenset({"NORMAL"}),
+    valid_option_strategies=frozenset({"SINGLE"}),
+    valid_market_categories=frozenset({"US"}),
+    valid_order_markets=frozenset({"US"}),
+    valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
+    supports_options=False,
+)
+
+
+# =============================================================================
+# BR Region Configuration
+# =============================================================================
+BR_REGION_CONFIG = RegionConfig(
+    region_id="br",
+    supports_futures=False,
+    supports_crypto=False,
+    supports_event_contracts=False,
+    supports_combo_orders=False,
+    supports_option_strategies=False,
+    supports_algo_orders=False,
+    valid_order_types=frozenset({
+        "MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"
+    }),
+    valid_time_in_force=frozenset({"DAY", "GTC"}),
+    valid_trading_sessions=frozenset({"NIGHT", "ALL", "CORE", "ALL_DAY"}),
+    valid_combo_types=frozenset({"NORMAL"}),
+    valid_option_strategies=frozenset({"SINGLE"}),
+    valid_market_categories=frozenset({"US"}),
+    valid_order_markets=frozenset({"US"}),
+    valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
+    supports_options=False,
+)
+
+
+# =============================================================================
 # Region Configuration Registry
 # =============================================================================
 REGION_CONFIGS: dict[str, RegionConfig] = {
@@ -231,6 +288,8 @@ REGION_CONFIGS: dict[str, RegionConfig] = {
     "th": TH_REGION_CONFIG,
     "my": MY_REGION_CONFIG,
     "uk": UK_REGION_CONFIG,
+    "mx": MX_REGION_CONFIG,
+    "br": BR_REGION_CONFIG,
 }
 
 SUPPORTED_REGIONS: frozenset[str] = frozenset(REGION_CONFIGS.keys())

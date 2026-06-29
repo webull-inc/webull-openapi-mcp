@@ -236,6 +236,27 @@ class TestFormatStockSnapshot:
         assert "250.00" in result
         assert "1000000" in result
 
+    def test_formats_snapshot_with_fundamental_fields(self):
+        data = [{"symbol": "AAPL", "price": "290.00",
+                 "turnover": "23000000000", "eps": "6.5",
+                 "eps_ttm": "6.8", "lot_size": "1", "bps": "4.2"}]
+        result = format_stock_snapshot(data)
+        assert "AAPL" in result
+        assert "Turnover:" in result
+        assert "23000000000" in result
+        assert "EPS:" in result
+        assert "6.5" in result
+        assert "EPS(TTM):" in result
+        assert "6.8" in result
+        assert "Lot Size:" in result
+        assert "BPS:" in result
+        assert "4.2" in result
+
+    def test_omits_fundamental_line_when_absent(self):
+        data = [{"symbol": "TSLA", "price": "250.00"}]
+        result = format_stock_snapshot(data)
+        assert "EPS(TTM)" not in result
+
 
 class TestFormatStockBars:
     def test_formats_bars(self):
