@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "webull-openapi-mcp"
-version = "1.1.4"
+version = "1.1.5"
 description = "MCP Server for Webull OpenAPI - enables AI assistants to securely access Webull trading and market data"
 readme = "README.md"
 license = "Apache-2.0"
