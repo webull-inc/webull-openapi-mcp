@@ -144,9 +144,9 @@ UAT_ENDPOINTS: dict = {
     "regions": ["us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br", "eu", "za", "au"],
     "region_mapping": {
         "us": {
-            "api": "us-openapi-alb.uat.webullbroker.com",
-            "quotes-api": "us-openapi-quotes-api.uat.webullbroker.com",
-            "events-api": "us-openapi-events.uat.webullbroker.com",
+            "api": "api.sandbox.webull.com",
+            "quotes-api": "api.sandbox.webull.com",
+            "events-api": "events-api.sandbox.webull.com",
         },
         "hk": {
             "api": "api.sandbox.webull.hk",
