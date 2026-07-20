@@ -122,8 +122,10 @@ class OrderValidator:
         self._validate_order_type(params.get("order_type"), params.get("market"))
         self._validate_time_in_force(params.get("time_in_force"), params.get("market"))
         self._validate_trading_session(params.get("trading_session"))
-        # Skip quantity/notional validation for AMOUNT entrust_type (fractional shares)
-        if params.get("entrust_type") != "AMOUNT":
+        # AMOUNT entrust_type (fractional shares): cap the dollar amount instead of quantity
+        if params.get("entrust_type") == "AMOUNT":
+            self._validate_cash_amount(params.get("total_cash_amount"), params.get("market"))
+        else:
             self._validate_quantity(params.get("quantity"), params.get("limit_price"), params.get("market"))
         self._validate_price_fields(
             params.get("order_type"),
@@ -142,9 +144,14 @@ class OrderValidator:
             self._validate_jp_order_fields(params)
 
     def validate_combo_order(self, params: dict) -> None:
-        """Validate combo order parameters (US only)."""
+        """Validate combo order parameters (US only).
+
+        Applies quantity, notional, and symbol-whitelist checks to every leg
+        so combo orders cannot bypass the risk limits enforced on plain
+        stock orders.
+        """
         self._validate_combo_type(params.get("combo_type"))
-        
+
         # Validate each order leg
         orders = params.get("orders", [])
         for order in orders:
@@ -152,9 +159,38 @@ class OrderValidator:
             self._validate_order_type(order.get("order_type"), order.get("market"))
             if order.get("time_in_force"):
                 self._validate_time_in_force(order.get("time_in_force"))
+            self._validate_quantity(
+                order.get("quantity"), order.get("limit_price"), order.get("market", "US")
+            )
+            self._validate_symbol_whitelist(order.get("symbol"))
+
+    def validate_combo_leg(self, leg: dict) -> None:
+        """Validate a single combo-order leg (US only).
+
+        Unlike ``validate_combo_order`` (which validates a
+        ``{"combo_type": ..., "orders": [...]}`` payload as a whole), this
+        validates one leg dict at a time -- the shape actually produced by
+        ``place_stock_combo_order``, where each leg carries its own
+        ``combo_type`` (NORMAL, MASTER, STOP_PROFIT, STOP_LOSS, etc.).
+        """
+        self._validate_combo_type(leg.get("combo_type", "NORMAL"))
+        self._validate_side(leg.get("side"))
+        self._validate_order_type(leg.get("order_type"), leg.get("market"))
+        if leg.get("time_in_force"):
+            self._validate_time_in_force(leg.get("time_in_force"), leg.get("market"))
+        self._validate_quantity(
+            leg.get("quantity"), leg.get("limit_price"), leg.get("market", "US")
+        )
+        self._validate_symbol_whitelist(leg.get("symbol"))
 
     def validate_option_order(self, params: dict) -> None:
-        """Validate single-leg option order parameters."""
+        """Validate single-leg option order parameters.
+
+        Quantity/notional and symbol-whitelist checks apply whenever the
+        caller supplies a ``quantity`` (the real order-placement call sites
+        always do; validation-focused callers may omit it to test other
+        fields in isolation).
+        """
         self._validate_side(params.get("side"))
         self._validate_option_order_type(params.get("order_type"))
         self._validate_option_tif(params.get("time_in_force"))
@@ -163,20 +199,38 @@ class OrderValidator:
             params.get("limit_price"),
             params.get("stop_price"),
         )
+        if params.get("quantity") is not None:
+            self._validate_quantity(
+                params.get("quantity"), params.get("limit_price"), params.get("market", "US")
+            )
+        self._validate_symbol_whitelist(params.get("symbol"))
 
     def validate_option_strategy_order(self, params: dict) -> None:
-        """Validate option strategy order parameters (US only)."""
+        """Validate option strategy order parameters (US only).
+
+        Every leg's quantity is checked against max_order_quantity and the
+        symbol whitelist; the overall order quantity/notional is checked
+        when supplied.
+        """
         strategy = params.get("strategy")
         self._validate_option_strategy(strategy)
-        
+
         # Validate leg count
         legs = params.get("legs", [])
         self._validate_strategy_leg_count(strategy, len(legs))
-        
+
         # Validate each leg
         for i, leg in enumerate(legs):
             self._validate_option_leg(leg, i)
-        
+            self._validate_quantity(leg.get("quantity"), None, leg.get("market", "US"))
+            self._validate_symbol_whitelist(leg.get("symbol"))
+
+        # Validate overall order quantity/notional, if supplied
+        if params.get("quantity") is not None:
+            self._validate_quantity(
+                params.get("quantity"), params.get("limit_price"), params.get("market", "US")
+            )
+
         # Validate order parameters
         self._validate_option_order_type(params.get("order_type"))
         self._validate_option_tif(params.get("time_in_force"))
@@ -188,10 +242,13 @@ class OrderValidator:
                 feature="algo_orders",
                 region_id=self.region_config.region_id,
             )
-        
+
         self._validate_side(params.get("side"))
-        self._validate_quantity(params.get("quantity"), params.get("limit_price"))
-        
+        self._validate_quantity(
+            params.get("quantity"), params.get("limit_price"), params.get("market", "US")
+        )
+        self._validate_symbol_whitelist(params.get("symbol"))
+
         algo_type = params.get("algo_type")
         if algo_type is None:
             raise ValidationError("algo_type is required", field="algo_type")
@@ -252,6 +309,25 @@ class OrderValidator:
                     f"exceeds max_order_notional_{currency.lower()} {max_notional:.2f}",
                     field="notional",
                 )
+
+    def _validate_cash_amount(self, total_cash_amount: float | None, market: str | None = None) -> None:
+        """Validate a dollar-denominated (AMOUNT entrust_type) order against the notional cap.
+
+        AMOUNT orders have no quantity to bound, so the configured notional
+        limit is applied directly to total_cash_amount instead.
+        """
+        if total_cash_amount is None or total_cash_amount <= 0:
+            raise ValidationError(
+                f"total_cash_amount must be > 0, got {total_cash_amount}",
+                field="total_cash_amount",
+            )
+        max_notional, currency = self.server_config.get_max_notional_for_market(market)
+        if total_cash_amount > max_notional:
+            raise ValidationError(
+                f"total_cash_amount {total_cash_amount:.2f} {currency} "
+                f"exceeds max_order_notional_{currency.lower()} {max_notional:.2f}",
+                field="total_cash_amount",
+            )
 
     def _validate_price_fields(
         self, order_type: str | None, limit_price: float | None, stop_price: float | None
@@ -627,6 +703,15 @@ def validate_combo_order(params: dict, config: ServerConfig) -> None:
     region_config = get_region_config(config.region_id)
     validator = OrderValidator(region_config, config)
     validator.validate_combo_order(params)
+
+
+def validate_combo_leg(leg: dict, config: ServerConfig) -> None:
+    """Validate a single combo-order leg (see OrderValidator.validate_combo_leg)."""
+    from webull_openapi_mcp.region_config import get_region_config
+
+    region_config = get_region_config(config.region_id)
+    validator = OrderValidator(region_config, config)
+    validator.validate_combo_leg(leg)
 
 
 def validate_algo_order(params: dict, config: ServerConfig) -> None:

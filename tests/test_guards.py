@@ -276,6 +276,53 @@ class TestSymbolWhitelist:
 
 
 # ---------------------------------------------------------------------------
+# AMOUNT (dollar-denominated) Order Notional Cap
+# ---------------------------------------------------------------------------
+
+class TestCashAmountValidation:
+    def _amount_params(self, **overrides) -> dict:
+        base = dict(
+            symbol="AAPL",
+            side="BUY",
+            order_type="MARKET",
+            time_in_force="DAY",
+            entrust_type="AMOUNT",
+            total_cash_amount=500.0,
+        )
+        base.update(overrides)
+        return base
+
+    def test_amount_within_limit_allowed(self):
+        _us_validator(max_order_notional_usd=1_000.0).validate_stock_order(
+            self._amount_params(total_cash_amount=500.0)
+        )
+
+    def test_amount_exceeding_limit_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_notional_usd=1_000.0).validate_stock_order(
+                self._amount_params(total_cash_amount=1_001.0)
+            )
+        assert exc_info.value.field == "total_cash_amount"
+
+    def test_amount_missing_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator().validate_stock_order(self._amount_params(total_cash_amount=None))
+        assert exc_info.value.field == "total_cash_amount"
+
+    def test_amount_zero_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator().validate_stock_order(self._amount_params(total_cash_amount=0))
+        assert exc_info.value.field == "total_cash_amount"
+
+    def test_amount_hk_market_uses_hkd_limit(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _hk_validator(max_order_notional_hkd=1_000.0).validate_stock_order(
+                self._amount_params(market="HK", total_cash_amount=1_001.0)
+            )
+        assert "HKD" in exc_info.value.message
+
+
+# ---------------------------------------------------------------------------
 # Combo Order Validation (US Only)
 # ---------------------------------------------------------------------------
 
@@ -302,6 +349,88 @@ class TestComboOrderValidation:
                 "combo_type": "INVALID",
                 "orders": []
             })
+
+    def test_leg_quantity_exceeding_max_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_quantity=100).validate_combo_order({
+                "combo_type": "OTO",
+                "orders": [
+                    {"symbol": "AAPL", "side": "BUY", "order_type": "LIMIT", "quantity": 101},
+                ],
+            })
+        assert exc_info.value.field == "quantity"
+
+    def test_leg_notional_exceeding_max_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_notional_usd=1_000.0).validate_combo_order({
+                "combo_type": "OTO",
+                "orders": [
+                    {
+                        "symbol": "AAPL", "side": "BUY", "order_type": "LIMIT",
+                        "quantity": 100, "limit_price": 50.0,
+                    },
+                ],
+            })
+        assert exc_info.value.field == "notional"
+
+    def test_leg_symbol_not_in_whitelist_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(symbol_whitelist=["AAPL"]).validate_combo_order({
+                "combo_type": "OTO",
+                "orders": [
+                    {"symbol": "TSLA", "side": "BUY", "order_type": "LIMIT", "quantity": 10},
+                ],
+            })
+        assert exc_info.value.field == "symbol"
+
+
+# ---------------------------------------------------------------------------
+# Combo Leg Validation (per-leg calling convention used by
+# place_stock_combo_order, where each leg carries its own combo_type)
+# ---------------------------------------------------------------------------
+
+class TestComboLegValidation:
+    def _leg(self, **overrides) -> dict:
+        base = {
+            "combo_type": "NORMAL",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "quantity": 10,
+        }
+        base.update(overrides)
+        return base
+
+    def test_valid_leg_allowed(self):
+        _us_validator().validate_combo_leg(self._leg())
+
+    def test_leg_defaults_combo_type_to_normal(self):
+        leg = self._leg()
+        del leg["combo_type"]
+        _us_validator().validate_combo_leg(leg)
+
+    def test_leg_invalid_side_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator().validate_combo_leg(self._leg(side="INVALID"))
+        assert exc_info.value.field == "side"
+
+    def test_leg_invalid_order_type_rejected(self):
+        with pytest.raises(RegionValidationError):
+            _us_validator().validate_combo_leg(self._leg(order_type="ENHANCED_LIMIT"))
+
+    def test_leg_quantity_exceeding_max_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_quantity=5).validate_combo_leg(self._leg(quantity=10))
+        assert exc_info.value.field == "quantity"
+
+    def test_leg_symbol_not_in_whitelist_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(symbol_whitelist=["AAPL"]).validate_combo_leg(self._leg(symbol="TSLA"))
+        assert exc_info.value.field == "symbol"
+
+    def test_hk_combo_leg_rejected(self):
+        with pytest.raises(FeatureNotSupportedError):
+            _hk_validator().validate_combo_leg(self._leg())
 
 
 # ---------------------------------------------------------------------------
@@ -361,6 +490,42 @@ class TestOptionPriceFieldValidation:
                 _valid_option_params(order_type="STOP_LOSS", stop_price=None)
             )
         assert exc_info.value.field == "stop_price"
+
+
+# ---------------------------------------------------------------------------
+# Option Order Risk Limits (quantity/notional/whitelist)
+# ---------------------------------------------------------------------------
+
+class TestOptionOrderRiskLimits:
+    def test_quantity_omitted_is_not_checked(self):
+        # Isolated field-validation callers may omit quantity entirely.
+        _us_validator().validate_option_order(_valid_option_params())
+
+    def test_quantity_exceeding_max_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_quantity=10).validate_option_order(
+                _valid_option_params(quantity=11)
+            )
+        assert exc_info.value.field == "quantity"
+
+    def test_quantity_within_max_allowed(self):
+        _us_validator(max_order_quantity=10).validate_option_order(
+            _valid_option_params(quantity=10)
+        )
+
+    def test_notional_exceeding_max_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_notional_usd=100.0).validate_option_order(
+                _valid_option_params(quantity=100, limit_price=5.00)
+            )
+        assert exc_info.value.field == "notional"
+
+    def test_symbol_not_in_whitelist_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(symbol_whitelist=["AAPL"]).validate_option_order(
+                _valid_option_params(symbol="TSLA")
+            )
+        assert exc_info.value.field == "symbol"
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +643,40 @@ class TestOptionLegFieldCompleteness:
 
 
 # ---------------------------------------------------------------------------
+# Option Strategy Risk Limits (per-leg quantity/whitelist, overall notional)
+# ---------------------------------------------------------------------------
+
+class TestOptionStrategyRiskLimits:
+    def test_leg_quantity_exceeding_max_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_quantity=10).validate_option_strategy_order(
+                _valid_strategy_params(legs=[_make_leg(quantity=11)])
+            )
+        assert exc_info.value.field == "quantity"
+
+    def test_leg_symbol_not_in_whitelist_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(symbol_whitelist=["OTHER"]).validate_option_strategy_order(
+                _valid_strategy_params(legs=[_make_leg()])
+            )
+        assert exc_info.value.field == "symbol"
+
+    def test_overall_quantity_omitted_is_not_checked(self):
+        # Top-level "quantity" is optional; only present when the caller
+        # supplies a contract-level quantity distinct from leg quantities.
+        _us_validator(max_order_quantity=1).validate_option_strategy_order(
+            _valid_strategy_params(legs=[_make_leg(quantity=1)])
+        )
+
+    def test_overall_quantity_exceeding_max_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_quantity=5).validate_option_strategy_order(
+                _valid_strategy_params(quantity=6, legs=[_make_leg(quantity=1)])
+            )
+        assert exc_info.value.field == "quantity"
+
+
+# ---------------------------------------------------------------------------
 # Algo Order Validation (US Only)
 # ---------------------------------------------------------------------------
 
@@ -513,6 +712,25 @@ class TestAlgoOrderValidation:
             "algo_type": "POV",
             "target_vol_percent": 0.1,
         })
+
+    def test_quantity_exceeding_max_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(max_order_quantity=10).validate_algo_order({
+                "side": "BUY",
+                "quantity": 11,
+                "algo_type": "TWAP",
+            })
+        assert exc_info.value.field == "quantity"
+
+    def test_symbol_not_in_whitelist_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator(symbol_whitelist=["AAPL"]).validate_algo_order({
+                "side": "BUY",
+                "quantity": 100,
+                "algo_type": "TWAP",
+                "symbol": "TSLA",
+            })
+        assert exc_info.value.field == "symbol"
 
 
 # ---------------------------------------------------------------------------

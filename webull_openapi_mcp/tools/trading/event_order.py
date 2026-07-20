@@ -79,15 +79,29 @@ def _validate_event_order(
     symbol: str,
     side: str,
     quantity: float,
+    limit_price: float,
     event_outcome: str,
+    order_type: str,
+    time_in_force: str,
     config: ServerConfig,
 ) -> None:
     """Validate event contract order parameters.
 
-    Checks: side, quantity limits, symbol whitelist, event_outcome.
+    Checks: side, order_type/time_in_force (LIMIT/DAY only), quantity and
+    notional limits, symbol whitelist, event_outcome.
     """
     if side not in ("BUY", "SELL"):
         raise ValidationError(f"Invalid side '{side}', must be BUY or SELL", field="side")
+    if order_type != "LIMIT":
+        raise ValidationError(
+            f"Invalid order_type '{order_type}', event contract orders only support LIMIT",
+            field="order_type",
+        )
+    if time_in_force != "DAY":
+        raise ValidationError(
+            f"Invalid time_in_force '{time_in_force}', event contract orders only support DAY",
+            field="time_in_force",
+        )
     if quantity is None or quantity <= 0:
         raise ValidationError(f"quantity must be > 0, got {quantity}", field="quantity")
     if quantity > config.max_order_quantity:
@@ -95,6 +109,15 @@ def _validate_event_order(
             f"quantity {quantity} exceeds max_order_quantity {config.max_order_quantity}",
             field="quantity",
         )
+    if limit_price is not None and limit_price > 0:
+        notional = quantity * limit_price
+        max_notional, currency = config.get_max_notional_for_market("US")
+        if notional > max_notional:
+            raise ValidationError(
+                f"Notional value {notional:.2f} {currency} "
+                f"exceeds max_order_notional_{currency.lower()} {max_notional:.2f}",
+                field="notional",
+            )
     if event_outcome not in ("yes", "no"):
         raise ValidationError(
             f"Invalid event_outcome '{event_outcome}', must be 'yes' or 'no'",
@@ -139,7 +162,10 @@ def register_event_order_tools(
 
         # Validate order parameters
         try:
-            _validate_event_order(symbol, side, quantity, event_outcome, config)
+            _validate_event_order(
+                symbol, side, quantity, limit_price, event_outcome,
+                order_type, time_in_force, config,
+            )
         except ValidationError as e:
             audit.log_validation_error("place_event_order", e.message, {
                 "symbol": symbol, "side": side, "quantity": quantity,

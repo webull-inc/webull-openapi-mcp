@@ -27,10 +27,14 @@ class TestUATEndpoints:
         assert UAT_ENDPOINTS["default_region"] == "us"
 
     def test_regions_list(self):
-        assert set(UAT_ENDPOINTS["regions"]) == {"us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br"}
+        assert set(UAT_ENDPOINTS["regions"]) == {
+            "us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br", "eu", "za", "au",
+        }
 
     def test_each_region_has_all_api_types(self):
-        for region in ("us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br"):
+        for region in (
+            "us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br", "eu", "za", "au",
+        ):
             mapping = UAT_ENDPOINTS["region_mapping"][region]
             assert "api" in mapping
             assert "quotes-api" in mapping
@@ -38,9 +42,9 @@ class TestUATEndpoints:
 
     def test_us_api_endpoints(self):
         us = UAT_ENDPOINTS["region_mapping"]["us"]
-        assert us["api"] == "us-openapi-alb.uat.webullbroker.com"
-        assert us["quotes-api"] == "us-openapi-quotes-api.uat.webullbroker.com"
-        assert us["events-api"] == "us-openapi-events.uat.webullbroker.com"
+        assert us["api"] == "api.sandbox.webull.com"
+        assert us["quotes-api"] == "api.sandbox.webull.com"
+        assert us["events-api"] == "events-api.sandbox.webull.com"
 
     def test_hk_api_endpoints(self):
         hk = UAT_ENDPOINTS["region_mapping"]["hk"]
@@ -53,6 +57,33 @@ class TestUATEndpoints:
         assert jp["api"] == "jp-openapi-alb.uat.webullbroker.com"
         assert jp["quotes-api"] == "data-api.uat.webullbroker.com"
         assert jp["events-api"] == "jp-openapi-events.uat.webullbroker.com"
+
+    def test_eu_api_endpoints(self):
+        eu = UAT_ENDPOINTS["region_mapping"]["eu"]
+        assert eu["api"] == "eu-api.uat.webullbroker.com"
+        assert eu["quotes-api"] == "eu-api.uat.webullbroker.com"
+        assert eu["events-api"] == "eu-events-api.uat.webullbroker.com"
+
+    def test_au_api_endpoints(self):
+        au = UAT_ENDPOINTS["region_mapping"]["au"]
+        assert au["api"] == "au-api.uat.webullbroker.com"
+        assert au["quotes-api"] == "au-api.uat.webullbroker.com"
+        assert au["events-api"] == "au-events-api.uat.webullbroker.com"
+
+    def test_za_api_endpoints(self):
+        za = UAT_ENDPOINTS["region_mapping"]["za"]
+        assert za["api"] == "za-api.uat.webullbroker.com"
+        assert za["quotes-api"] == "za-api.uat.webullbroker.com"
+        assert za["events-api"] == "za-events-api.uat.webullbroker.com"
+
+    def test_za_and_au_endpoints_are_distinct(self):
+        # Regression guard: za previously aliased au's UAT hostnames verbatim
+        # (a copy-paste bug in commit 14e43f0), even though the two regions
+        # have separate _2FA_GUIDE_LINKS domains and separate RegionConfig
+        # instances (ZA_REGION_CONFIG vs AU_REGION_CONFIG).
+        za = UAT_ENDPOINTS["region_mapping"]["za"]
+        au = UAT_ENDPOINTS["region_mapping"]["au"]
+        assert za != au
 
 
 # ---------------------------------------------------------------------------
@@ -183,9 +214,9 @@ class TestInitializeUAT:
         calls = api.add_endpoint.call_args_list
         call_args = [(c[0][0], c[0][1], c[0][2]) for c in calls]
         
-        assert ("us", "us-openapi-alb.uat.webullbroker.com", DEFAULT) in call_args
-        assert ("us", "us-openapi-quotes-api.uat.webullbroker.com", QUOTES) in call_args
-        assert ("us", "us-openapi-events.uat.webullbroker.com", EVENTS) in call_args
+        assert ("us", "api.sandbox.webull.com", DEFAULT) in call_args
+        assert ("us", "api.sandbox.webull.com", QUOTES) in call_args
+        assert ("us", "events-api.sandbox.webull.com", EVENTS) in call_args
 
     def test_registers_all_endpoint_types_for_uat_hk(self, MockApiClient, MockTrade, MockData):
         cfg = ServerConfig(app_key="k", app_secret="s", region_id="hk", environment="uat")
