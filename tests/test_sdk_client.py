@@ -70,6 +70,21 @@ class TestUATEndpoints:
         assert au["quotes-api"] == "au-api.uat.webullbroker.com"
         assert au["events-api"] == "au-events-api.uat.webullbroker.com"
 
+    def test_za_api_endpoints(self):
+        za = UAT_ENDPOINTS["region_mapping"]["za"]
+        assert za["api"] == "za-api.uat.webullbroker.com"
+        assert za["quotes-api"] == "za-api.uat.webullbroker.com"
+        assert za["events-api"] == "za-events-api.uat.webullbroker.com"
+
+    def test_za_and_au_endpoints_are_distinct(self):
+        # Regression guard: za previously aliased au's UAT hostnames verbatim
+        # (a copy-paste bug in commit 14e43f0), even though the two regions
+        # have separate _2FA_GUIDE_LINKS domains and separate RegionConfig
+        # instances (ZA_REGION_CONFIG vs AU_REGION_CONFIG).
+        za = UAT_ENDPOINTS["region_mapping"]["za"]
+        au = UAT_ENDPOINTS["region_mapping"]["au"]
+        assert za != au
+
 
 # ---------------------------------------------------------------------------
 # WebullSDKClient — construction

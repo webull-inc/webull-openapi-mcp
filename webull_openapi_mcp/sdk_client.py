@@ -194,9 +194,9 @@ UAT_ENDPOINTS: dict = {
             "events-api": "eu-events-api.uat.webullbroker.com",
         },
         "za": {
-            "api": "au-api.uat.webullbroker.com",
-            "quotes-api": "au-api.uat.webullbroker.com",
-            "events-api": "au-events-api.uat.webullbroker.com",
+            "api": "za-api.uat.webullbroker.com",
+            "quotes-api": "za-api.uat.webullbroker.com",
+            "events-api": "za-events-api.uat.webullbroker.com",
         },
         "au": {
             "api": "au-api.uat.webullbroker.com",
