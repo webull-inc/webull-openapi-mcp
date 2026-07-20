@@ -132,17 +132,17 @@ def register_crypto_order_tools(
         if time_in_force == "IOC" and order_type != "MARKET":
             return "Validation error: time_in_force=IOC is only supported for crypto MARKET orders"
 
-        if entrust_type != "AMOUNT":
-            params: dict = {
-                "side": side, "order_type": order_type, "time_in_force": time_in_force,
-                "quantity": quantity, "symbol": symbol,
-            }
-            if limit_price is not None:
-                params["limit_price"] = limit_price
-            try:
-                validate_stock_order(params, config)
-            except ValidationError as e:
-                return f"Validation error: {e.message}"
+        params: dict = {
+            "side": side, "order_type": order_type, "time_in_force": time_in_force,
+            "quantity": quantity, "symbol": symbol, "entrust_type": entrust_type,
+            "total_cash_amount": total_cash_amount,
+        }
+        if limit_price is not None:
+            params["limit_price"] = limit_price
+        try:
+            validate_stock_order(params, config)
+        except ValidationError as e:
+            return f"Validation error: {e.message}"
 
         coid = client_order_id or _generate_client_order_id()
 

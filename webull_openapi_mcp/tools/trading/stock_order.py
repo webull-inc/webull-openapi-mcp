@@ -27,7 +27,7 @@ from webull_openapi_mcp.guards import (
     validate_algo_order,
     validate_client_order_id,
     validate_close_contracts,
-    validate_combo_order,
+    validate_combo_leg,
     validate_stock_order,
 )
 from webull_openapi_mcp.tools.trading.account import (
@@ -495,7 +495,7 @@ def register_stock_order_tools(
             "entrust_type": entrust_type, "trading_session": trading_session,
             "market": market, "account_tax_type": account_tax_type,
             "margin_type": margin_type, "position_intent": position_intent,
-            "close_contracts": close_contracts,
+            "close_contracts": close_contracts, "total_cash_amount": total_cash_amount,
         }
         if limit_price is not None:
             params["limit_price"] = limit_price
@@ -769,9 +769,12 @@ def register_combo_order_tools(
             return f"Validation error: {e}"
         audit.log_tool_call("place_stock_combo_order", {"account_id": account_id})
 
+        if not orders:
+            return "Validation error: Combo order requires at least one order leg"
+
         for order in orders:
             try:
-                validate_combo_order(order, config)
+                validate_combo_leg(order, config)
             except ValidationError as e:
                 return f"Validation error: {e.message}"
 
@@ -855,7 +858,10 @@ def register_algo_order_tools(
         if effective_order_type not in ("MARKET", "LIMIT"):
             return f"Validation error: algo orders only support MARKET or LIMIT order_type, got '{effective_order_type}'"
 
-        params: dict = {"side": side, "order_type": effective_order_type, "quantity": quantity, "algo_type": algo_type}
+        params: dict = {
+            "side": side, "order_type": effective_order_type, "quantity": quantity,
+            "algo_type": algo_type, "symbol": symbol, "market": "US",
+        }
         try:
             validate_algo_order(params, config)
         except ValidationError as e:

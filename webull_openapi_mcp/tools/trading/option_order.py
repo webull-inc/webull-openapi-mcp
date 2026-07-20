@@ -252,7 +252,10 @@ def register_option_single_tools(
         except ValueError as e:
             return f"Account error: {e}"
 
-        params: dict = {"side": side, "order_type": order_type, "time_in_force": time_in_force}
+        params: dict = {
+            "side": side, "order_type": order_type, "time_in_force": time_in_force,
+            "quantity": quantity, "symbol": symbol, "market": "US",
+        }
         if limit_price is not None:
             params["limit_price"] = limit_price
         if stop_price is not None:
@@ -435,7 +438,10 @@ def register_option_strategy_tools(
             return f"Validation error: {e}"
         audit.log_tool_call("place_option_strategy_order", {"strategy": strategy})
 
-        params: dict = {"strategy": strategy, "order_type": order_type, "time_in_force": time_in_force, "legs": legs}
+        params: dict = {
+            "strategy": strategy, "order_type": order_type, "time_in_force": time_in_force,
+            "legs": legs, "quantity": quantity, "limit_price": limit_price, "market": "US",
+        }
         try:
             validate_option_strategy_order(params, config)
         except ValidationError as e:
