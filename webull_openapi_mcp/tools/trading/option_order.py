@@ -17,8 +17,9 @@ import uuid
 from typing import TYPE_CHECKING, Any, Optional
 
 from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
-from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data, format_order_preview
+from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data, format_order_preview, format_decimal
 from webull_openapi_mcp.guards import validate_client_order_id, validate_option_order, validate_option_strategy_order
+from webull_openapi_mcp.region_config import get_region_config
 from webull_openapi_mcp.tools.trading.account import (
     normalize_account_id,
     resolve_account_id,
@@ -56,9 +57,15 @@ def _format_order_result(data: dict) -> str:
 
 
 def _add_optional_str(order: dict, key: str, value: Any) -> None:
-    """Add a value to order dict as string if not None."""
+    """Add a value to order dict as string if not None.
+
+    Uses format_decimal for numeric types to avoid scientific notation.
+    """
     if value is not None:
-        order[key] = str(value)
+        if isinstance(value, (int, float)):
+            order[key] = format_decimal(value)
+        else:
+            order[key] = str(value)
 
 
 def _build_option_order(
@@ -73,13 +80,14 @@ def _build_option_order(
     time_in_force: str,
     limit_price: float | None,
     stop_price: float | None,
+    position_intent: str | None = None,
 ) -> dict:
     """Build a single-leg option order dict for the SDK."""
     order: dict = {
         "client_order_id": coid,
         "combo_type": "NORMAL",
         "order_type": order_type,
-        "quantity": str(quantity),
+        "quantity": format_decimal(quantity),
         "option_strategy": "SINGLE",
         "side": side,
         "time_in_force": time_in_force,
@@ -87,9 +95,9 @@ def _build_option_order(
         "legs": [
             {
                 "side": side,
-                "quantity": str(quantity),
+                "quantity": format_decimal(quantity),
                 "symbol": symbol,
-                "strike_price": str(strike_price),
+                "strike_price": format_decimal(strike_price),
                 "option_expire_date": expiration_date,
                 "instrument_type": "OPTION",
                 "option_type": option_type,
@@ -99,6 +107,8 @@ def _build_option_order(
     }
     _add_optional_str(order, "limit_price", limit_price)
     _add_optional_str(order, "stop_price", stop_price)
+    if position_intent is not None:
+        order["position_intent"] = position_intent
     return order
 
 
@@ -138,9 +148,9 @@ def _extract_leg_ids(detail: dict | None, quantity: int | None) -> list[dict] | 
                 orig_leg_qty = float(orig_leg_qty_str) if orig_leg_qty_str else None
                 if orig_top_qty and orig_leg_qty and orig_top_qty > 0:
                     ratio = orig_leg_qty / orig_top_qty
-                    entry["quantity"] = str(int(quantity * ratio))
+                    entry["quantity"] = format_decimal(int(quantity * ratio))
                 else:
-                    entry["quantity"] = str(quantity)
+                    entry["quantity"] = format_decimal(quantity)
             result.append(entry)
         return result
     return None
@@ -178,7 +188,7 @@ def _build_strategy_order(
         "symbol": symbol,
     }
     if quantity is not None:
-        order["quantity"] = str(quantity)
+        order["quantity"] = format_decimal(quantity)
     _add_optional_str(order, "limit_price", limit_price)
 
     # Build legs array — field order matches API demo payloads
@@ -226,6 +236,7 @@ def register_option_single_tools(
             "Call get_account_list first.\n"
             "order_type: MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT.\n"
             "time_in_force: DAY, GTC. trading_session: CORE only.\n"
+            "position_intent: BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, SELL_TO_CLOSE (optional, US only).\n"
             "Returns: {client_order_id, order_id}"
         ),
     )
@@ -242,13 +253,15 @@ def register_option_single_tools(
         client_order_id: Optional[str] = None,
         limit_price: Optional[float] = None,
         stop_price: Optional[float] = None,
+        position_intent: Optional[str] = None,
     ) -> str:
         """Place a single-leg option order."""
         audit.log_tool_call("place_option_single_order", {"symbol": symbol, "side": side})
 
         # Auto-resolve account_id
         try:
-            account_id = await resolve_account_id(sdk, "option", account_id)
+            region_cfg = get_region_config(config.region_id)
+            account_id = await resolve_account_id(sdk, "option", account_id, region_cfg)
         except ValueError as e:
             return f"Account error: {e}"
 
@@ -261,6 +274,14 @@ def register_option_single_tools(
             validate_option_order(params, config)
         except ValidationError as e:
             return f"Validation error: {e.message}"
+
+        if position_intent is not None:
+            from webull_openapi_mcp.constants import VALID_POSITION_INTENTS
+            if position_intent not in VALID_POSITION_INTENTS:
+                return (
+                    f"Validation error: Invalid position_intent '{position_intent}', "
+                    f"must be one of {sorted(VALID_POSITION_INTENTS)}"
+                )
 
         try:
             validate_client_order_id(client_order_id)
@@ -275,6 +296,7 @@ def register_option_single_tools(
             expiration_date=expiration_date, order_type=order_type,
             time_in_force=time_in_force,
             limit_price=limit_price, stop_price=stop_price,
+            position_intent=position_intent,
         )
 
         audit.log_order_attempt(

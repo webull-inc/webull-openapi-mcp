@@ -17,6 +17,7 @@ from webull_openapi_mcp.formatters import (
 if TYPE_CHECKING:
     from fastmcp import FastMCP
     from webull_openapi_mcp.audit import AuditLogger
+    from webull_openapi_mcp.region_config import RegionConfig
     from webull_openapi_mcp.sdk_client import WebullSDKClient
 
 
@@ -44,7 +45,7 @@ def register_account_tools(
     @mcp.tool(
         description=(
             "Get all linked accounts. "
-            "Returns: account_id, user_id, account_number, account_type, account_class, account_label."
+            "Returns: account_id, user_id, account_number, account_type, account_class."
         ),
         annotations={"readOnlyHint": True},
     )
@@ -60,20 +61,20 @@ def register_account_tools(
 
 
 def _validate_explicit_account(
-    accounts: list[dict], account_id: str, valid_labels: set[str], asset_type: str,
+    accounts: list[dict], account_id: str, valid_classes: set[str], asset_type: str,
 ) -> dict | None:
-    """Validate an explicitly provided account_id against the required labels.
+    """Validate an explicitly provided account_id against the required account classes.
 
-    Raises ValueError if the account type doesn't match. Returns the matched
+    Raises ValueError if the account class doesn't match. Returns the matched
     account, or None if the account_id is absent from account_list.
     """
     for acct in accounts:
         if str(acct.get("account_id")) == account_id:
-            label = acct.get("account_label", "")
-            if label and label not in valid_labels:
-                expected = ", ".join(sorted(valid_labels))
+            account_class = acct.get("account_class", "")
+            if account_class and account_class not in valid_classes:
+                expected = ", ".join(sorted(valid_classes))
                 raise ValueError(
-                    f"Account '{account_id}' (label: {label}) does not support {asset_type} trading. "
+                    f"Account '{account_id}' (class: {account_class}) does not support {asset_type} trading. "
                     f"Required account types: {expected}. "
                     f"Please use get_account_list to find the correct account."
                 )
@@ -83,12 +84,12 @@ def _validate_explicit_account(
 
 
 def _auto_select_account(
-    accounts: list[dict], valid_labels: set[str], asset_type: str,
+    accounts: list[dict], valid_classes: set[str], asset_type: str,
 ) -> dict:
-    """Auto-select an account matching the required labels."""
+    """Auto-select an account matching the required account classes."""
     matching = [
         acct for acct in accounts
-        if acct.get("account_label", "") in valid_labels
+        if acct.get("account_class", "") in valid_classes
     ]
 
     if len(matching) == 1:
@@ -96,7 +97,7 @@ def _auto_select_account(
 
     if len(matching) > 1:
         acct_list = ", ".join(
-            f"{a['account_id']} ({a.get('account_label', 'N/A')})"
+            f"{a['account_id']} ({a.get('account_class', 'N/A')})"
             for a in matching
         )
         raise ValueError(
@@ -104,7 +105,7 @@ def _auto_select_account(
             f"Please specify account_id explicitly."
         )
 
-    expected = ", ".join(sorted(valid_labels))
+    expected = ", ".join(sorted(valid_classes))
     raise ValueError(
         f"No account found for {asset_type} trading. "
         f"Required account types: {expected}."
@@ -115,6 +116,7 @@ async def resolve_account(
     sdk: WebullSDKClient,
     asset_type: str,
     account_id: str | None = None,
+    region_config: RegionConfig | None = None,
 ) -> dict:
     """Resolve and validate the correct account for a given asset type.
 
@@ -122,12 +124,12 @@ async def resolve_account(
     - If not provided, auto-selects the first matching account.
     - For single-account setups (e.g., HK region), uses that account directly.
     - If multiple matching accounts exist, refuses to auto-select.
+    - If region_config has no mapping for the asset_type, skips class validation.
     """
-    from webull_openapi_mcp.constants import ASSET_TYPE_ACCOUNT_LABELS
-
-    valid_labels = ASSET_TYPE_ACCOUNT_LABELS.get(asset_type)
-    if valid_labels is None:
-        raise ValueError(f"Unknown asset_type '{asset_type}'")
+    valid_classes: frozenset[str] | None = None
+    if region_config is not None:
+        valid_classes = region_config.asset_type_account_classes.get(asset_type)
+    # If region_config not provided or asset_type not in its mapping, skip class validation
 
     response = sdk.trade.account_v2.get_account_list()
     accounts = extract_response_data(response)
@@ -138,25 +140,39 @@ async def resolve_account(
     normalized_account_id = normalize_account_id(account_id)
 
     if normalized_account_id is not None:
-        account = _validate_explicit_account(
-            accounts,
-            normalized_account_id,
-            valid_labels,
-            asset_type,
-        )
+        if valid_classes:
+            account = _validate_explicit_account(
+                accounts,
+                normalized_account_id,
+                valid_classes,
+                asset_type,
+            )
+        else:
+            # No class validation — just find the account by ID
+            account = next(
+                (a for a in accounts if str(a.get("account_id")) == normalized_account_id),
+                None,
+            )
         return account if account is not None else {"account_id": normalized_account_id}
 
     if len(accounts) == 1:
         return accounts[0]
 
-    return _auto_select_account(accounts, valid_labels, asset_type)
+    if valid_classes:
+        return _auto_select_account(accounts, valid_classes, asset_type)
+
+    # No class mapping and multiple accounts — cannot auto-select
+    raise ValueError(
+        f"Multiple accounts found. Please specify account_id explicitly."
+    )
 
 
 async def resolve_account_id(
     sdk: WebullSDKClient,
     asset_type: str,
     account_id: str | None = None,
+    region_config: RegionConfig | None = None,
 ) -> str:
     """Resolve and validate the correct account_id for a given asset type."""
-    account = await resolve_account(sdk, asset_type, account_id)
+    account = await resolve_account(sdk, asset_type, account_id, region_config)
     return str(account["account_id"])

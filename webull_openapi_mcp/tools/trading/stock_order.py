@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from webull_openapi_mcp.constants import JP_MARGIN_ACCOUNT_TYPES, VALID_POSITION_INTENTS
 from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
-from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data, format_order_preview
+from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data, format_order_preview, format_decimal
 from webull_openapi_mcp.guards import (
     validate_algo_order,
     validate_client_order_id,
@@ -34,6 +34,7 @@ from webull_openapi_mcp.tools.trading.account import (
     normalize_account_id,
     resolve_account,
 )
+from webull_openapi_mcp.region_config import get_region_config
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -77,9 +78,15 @@ def _format_order_result(data: dict) -> str:
 
 
 def _add_optional_str(order: dict, key: str, value: Any) -> None:
-    """Add a value to order dict as string if not None."""
+    """Add a value to order dict as string if not None.
+
+    Uses format_decimal for numeric types to avoid scientific notation.
+    """
     if value is not None:
-        order[key] = str(value)
+        if isinstance(value, (int, float)):
+            order[key] = format_decimal(value)
+        else:
+            order[key] = str(value)
 
 
 def _build_stock_order(params: dict) -> dict:
@@ -105,9 +112,9 @@ def _build_stock_order(params: dict) -> dict:
     }
 
     if entrust_type == "AMOUNT" and params.get("total_cash_amount") is not None:
-        order["total_cash_amount"] = str(params["total_cash_amount"])
+        order["total_cash_amount"] = format_decimal(params["total_cash_amount"])
     else:
-        order["quantity"] = str(params["quantity"])
+        order["quantity"] = format_decimal(params["quantity"])
 
     _add_optional_str(order, "limit_price", params.get("limit_price"))
     _add_optional_str(order, "stop_price", params.get("stop_price"))
@@ -381,7 +388,7 @@ def _build_algo_order(
         "market": "US",
         "symbol": symbol,
         "side": side,
-        "quantity": str(quantity),
+        "quantity": format_decimal(quantity),
         "algo_type": algo_type,
         "entrust_type": "QTY",
         "client_order_id": coid,
@@ -481,7 +488,8 @@ def register_stock_order_tools(
 
         # Auto-resolve account_id
         try:
-            account = await resolve_account(sdk, "stock", account_id)
+            region_cfg = get_region_config(config.region_id)
+            account = await resolve_account(sdk, "stock", account_id, region_cfg)
             account_id = str(account["account_id"])
         except ValueError as e:
             return f"Account error: {e}"
@@ -586,6 +594,7 @@ def register_stock_order_tools(
         close_contracts: Optional[list[dict]] = None,
     ) -> str:
         """Preview a stock order without submitting."""
+        region_cfg = get_region_config(config.region_id)
         try:
             account_id = normalize_account_id(account_id)
         except ValueError as e:
@@ -607,7 +616,7 @@ def register_stock_order_tools(
             validate_stock_order(params, config)
             account_type = None
             if config.region_id == "jp" and margin_type is not None:
-                account = await resolve_account(sdk, "stock", account_id)
+                account = await resolve_account(sdk, "stock", account_id, region_cfg)
                 account_id = str(account["account_id"])
                 account_type = account.get("account_type")
             _validate_jp_margin_type_account(

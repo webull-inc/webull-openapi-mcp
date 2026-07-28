@@ -9,7 +9,18 @@ a human-readable formatted string. The disclaimer prefix is region-aware:
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
+
+
+def format_decimal(value: float | int) -> str:
+    """Format a numeric value to a plain decimal string without scientific notation.
+
+    Examples:
+        format_decimal(0.00005)  -> "0.00005"  (not "5e-05")
+        format_decimal(67000.0)  -> "67000"
+    """
+    return f"{Decimal(str(value)).normalize():f}"
 
 # Region-specific disclaimers
 _DISCLAIMER_US = (
