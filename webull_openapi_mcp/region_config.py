@@ -41,6 +41,16 @@ class RegionConfig:
     # high dividend, 52-week high/low). Currently only US / HK / JP markets.
     supports_fundamentals: bool = False
 
+    # Account class to asset type mapping for this region.
+    # Keys: "stock", "option", "futures", "crypto", "event"
+    # Values: frozenset of valid account_class values for that asset type.
+    # Empty dict means no account class validation (fallback to single-account logic).
+    asset_type_account_classes: dict[str, frozenset[str]] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.asset_type_account_classes is None:
+            object.__setattr__(self, "asset_type_account_classes", {})
+
 
 # =============================================================================
 # US Region Configuration
@@ -71,6 +81,21 @@ US_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_fundamentals=True,
+    asset_type_account_classes={
+        "stock": frozenset({
+            "INDIVIDUAL_CASH", "INDIVIDUAL_MARGIN",
+            "ROTH_IRA", "TRADITIONAL_IRA", "ROLLOVER_IRA",
+            "MANAGED_ROTH_IRA", "MANAGED_TRADITIONAL_IRA",
+        }),
+        "option": frozenset({
+            "INDIVIDUAL_CASH", "INDIVIDUAL_MARGIN",
+            "ROTH_IRA", "TRADITIONAL_IRA", "ROLLOVER_IRA",
+            "MANAGED_ROTH_IRA", "MANAGED_TRADITIONAL_IRA",
+        }),
+        "crypto": frozenset({"CRYPTO"}),
+        "futures": frozenset({"FUTURES"}),
+        "event": frozenset({"EVENTS_CASH"}),
+    },
 )
 
 
@@ -97,6 +122,17 @@ HK_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US", "HK", "CN"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF", "HK_STOCK", "CN_STOCK"}),
     supports_fundamentals=True,
+    asset_type_account_classes={
+        "stock": frozenset({
+            "INDIVIDUAL_CASH", "INDIVIDUAL_MRGN",
+            "INSTITUTIONAL_CASH", "INSTITUTIONAL_MRGN",
+        }),
+        "option": frozenset({
+            "INDIVIDUAL_CASH", "INDIVIDUAL_MRGN",
+            "INSTITUTIONAL_CASH", "INSTITUTIONAL_MRGN",
+        }),
+        "futures": frozenset({"FUTURES_MRGN", "INSTITUTIONAL_FUTURES_MRGN"}),
+    },
 )
 
 
@@ -124,6 +160,10 @@ JP_REGION_CONFIG = RegionConfig(
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
     supports_fundamentals=True,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH", "INDIVIDUAL_US_MARGIN"}),
+        "option": frozenset({"INDIVIDUAL_US_OPTION"}),
+    },
 )
 
 
@@ -149,6 +189,9 @@ SG_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH", "INDIVIDUAL_MRGN", "INDIVIDUAL_US_MARGIN"}),
+    },
 )
 
 
@@ -174,6 +217,9 @@ TH_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH"}),
+    },
 )
 
 
@@ -199,6 +245,9 @@ MY_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH", "INDIVIDUAL_MRGN", "INDIVIDUAL_US_MARGIN"}),
+    },
 )
 
 
@@ -224,6 +273,9 @@ UK_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH", "STOCK_ISA_CASH"}),
+    },
 )
 
 
@@ -249,6 +301,9 @@ MX_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH", "INDIVIDUAL_MRGN", "INDIVIDUAL_US_MARGIN"}),
+    },
 )
 
 
@@ -274,6 +329,9 @@ BR_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH", "INDIVIDUAL_MRGN", "INDIVIDUAL_US_MARGIN"}),
+    },
 )
 
 
@@ -299,6 +357,9 @@ EU_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH"}),
+    },
 )
 
 
@@ -324,6 +385,9 @@ ZA_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH", "INDIVIDUAL_MRGN", "INDIVIDUAL_US_MARGIN"}),
+    },
 )
 
 
@@ -349,6 +413,9 @@ AU_REGION_CONFIG = RegionConfig(
     valid_order_markets=frozenset({"US"}),
     valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
     supports_options=False,
+    asset_type_account_classes={
+        "stock": frozenset({"INDIVIDUAL_CASH", "INDIVIDUAL_MRGN", "INDIVIDUAL_US_MARGIN"}),
+    },
 )
 
 

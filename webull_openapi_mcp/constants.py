@@ -79,34 +79,8 @@ STRATEGY_LEG_COUNT: dict[str, tuple[int, int]] = {
 
 
 # =============================================================================
-# Account label to asset type mapping (US region)
+# Account class constants (kept for backward compatibility / reference)
 # =============================================================================
-
-# Account labels that support stock and option trading
-STOCK_OPTION_ACCOUNT_LABELS: frozenset[str] = frozenset({
-    "Individual Cash",
-    "Individual Margin",
-    "Individual US Margin",
-    "Roth IRA",
-    "Traditional IRA",
-    "Rollover IRA",
-    "Managed Roth IRA",
-    "Managed Traditional IRA",
-})
 
 # JP margin_type is available only for JP margin account types.
 JP_MARGIN_ACCOUNT_TYPES: frozenset[str] = frozenset({"US_MARGIN"})
-
-# Account labels for specific asset types
-FUTURES_ACCOUNT_LABEL = "Futures"
-CRYPTO_ACCOUNT_LABEL = "Crypto"
-EVENT_ACCOUNT_LABEL = "Events Cash"
-
-# Mapping from order asset type to valid account labels
-ASSET_TYPE_ACCOUNT_LABELS: dict[str, frozenset[str]] = {
-    "stock": STOCK_OPTION_ACCOUNT_LABELS,
-    "option": STOCK_OPTION_ACCOUNT_LABELS,
-    "futures": frozenset({FUTURES_ACCOUNT_LABEL}),
-    "crypto": frozenset({CRYPTO_ACCOUNT_LABEL}),
-    "event": frozenset({EVENT_ACCOUNT_LABEL}),
-}

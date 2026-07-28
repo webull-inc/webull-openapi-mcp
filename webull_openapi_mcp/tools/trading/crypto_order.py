@@ -13,8 +13,9 @@ import uuid
 from typing import TYPE_CHECKING, Optional
 
 from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
-from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data
+from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data, format_decimal
 from webull_openapi_mcp.guards import validate_client_order_id, validate_stock_order
+from webull_openapi_mcp.region_config import get_region_config
 from webull_openapi_mcp.tools.trading.account import resolve_account_id
 
 if TYPE_CHECKING:
@@ -70,14 +71,14 @@ def _build_crypto_order(
     }
 
     if entrust_type == "AMOUNT" and total_cash_amount is not None:
-        order["total_cash_amount"] = str(total_cash_amount)
+        order["total_cash_amount"] = format_decimal(total_cash_amount)
     elif quantity is not None:
-        order["quantity"] = str(quantity)
+        order["quantity"] = format_decimal(quantity)
 
     if limit_price is not None:
-        order["limit_price"] = str(limit_price)
+        order["limit_price"] = format_decimal(limit_price)
     if stop_price is not None:
-        order["stop_price"] = str(stop_price)
+        order["stop_price"] = format_decimal(stop_price)
 
     return order
 
@@ -117,7 +118,8 @@ def register_crypto_order_tools(
 
         # Auto-resolve account_id
         try:
-            account_id = await resolve_account_id(sdk, "crypto", account_id)
+            region_cfg = get_region_config(config.region_id)
+            account_id = await resolve_account_id(sdk, "crypto", account_id, region_cfg)
         except ValueError as e:
             return f"Account error: {e}"
 
@@ -139,6 +141,8 @@ def register_crypto_order_tools(
             }
             if limit_price is not None:
                 params["limit_price"] = limit_price
+            if stop_price is not None:
+                params["stop_price"] = stop_price
             try:
                 validate_stock_order(params, config)
             except ValidationError as e:
