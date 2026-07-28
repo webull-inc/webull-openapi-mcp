@@ -3,7 +3,7 @@
   "name": "io.github.webull-inc/webull-openapi-mcp",
   "title": "Webull OpenAPI",
   "description": "MCP server for Webull OpenAPI: trading and market data access for AI assistants",
-  "version": "1.1.7",
+  "version": "1.1.9",
   "repository": {
     "url": "https://github.com/webull-inc/webull-openapi-mcp",
     "source": "github"
@@ -13,7 +13,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "webull-openapi-mcp",
-      "version": "1.1.7",
+      "version": "1.1.9",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
