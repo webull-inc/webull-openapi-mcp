@@ -1,0 +1,16 @@
+# Exclude local/dev artifacts from the packed .mcpb bundle.
+# The uv server type must NOT ship a prebuilt environment; the host
+# provisions dependencies at install time from pyproject.toml.
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+uv.lock
+.DS_Store
+.python-version
+# Build tooling (not needed at runtime inside the bundle)
+build.sh
+build_manifest.py
+# Never nest a previously built bundle inside a new one
+*.mcpb

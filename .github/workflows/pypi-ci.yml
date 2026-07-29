@@ -1,56 +1,266 @@
 name: PyPI-CI
 
+# Release is driven by version tags (vX.Y.Z). Pushing to main no longer
+# publishes, which avoids "version already exists" failures when the version
+# in pyproject.toml was not bumped. Manual runs are still allowed.
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-    paths-ignore:
-      - 'docs/**'
-      - 'tests/**'
-      - 'LICENSE'
-      - 'DISCLAIMER.md'
-      - 'README.md'
+    tags:
+      - '*'   # numeric version tags only, e.g. 1.2.0
 
+# Least privilege by default; each job escalates only what it needs.
 permissions:
   contents: read
-  id-token: write
+
+env:
+  # Pin third-party CLIs so an upstream release cannot break the pipeline.
+  SMITHERY_VERSION: '1.2.0'
+  # mcp-publisher: set to a release tag (e.g. v1.0.0) to pin; 'latest' otherwise.
+  MCP_PUBLISHER_REF: 'latest'
+  SMITHERY_TARGET: 'webull/webull-openapi-mcp'   # <namespace>/<server-id>
 
 jobs:
-  push-webull-openapi-mcp:
+  # ---------------------------------------------------------------------------
+  # 1) Verify: single source of truth for the version, tests, build, artifact
+  #    checks and a real wheel smoke test. Nothing is published here.
+  # ---------------------------------------------------------------------------
+  verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v3
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.12'   # satisfies requires-python (<3.13); builds the pure-python wheel
 
-      - name: Install dependencies
-        run: python -m pip install --upgrade pip && pip install build hatchling
+      - name: Resolve and verify version
+        id: ver
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            if [ "$TAG" != "$VERSION" ]; then
+              echo "::error::Tag ${GITHUB_REF_NAME} does not match pyproject version ${VERSION}"
+              exit 1
+            fi
+            echo "Tag matches pyproject version: $VERSION"
+          else
+            echo "Manual run; building pyproject version: $VERSION"
+          fi
+
+      - name: Install package (with dev deps) and build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build hatchling twine
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest -q
 
       - name: Build package
         run: python -m build
 
-      - name: Publish package
+      - name: Check distribution metadata
+        run: twine check dist/*
+
+      - name: Smoke-test the built wheel
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+          echo "--- version ---"; /tmp/smoke/bin/webull-openapi-mcp --version
+          echo "--- tools ---";   /tmp/smoke/bin/webull-openapi-mcp tools > /dev/null && echo "CLI starts and lists tools OK"
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # 2) Publish the verified distribution to PyPI.
+  # ---------------------------------------------------------------------------
+  publish-pypi:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # For PyPI Trusted Publishing (OIDC) instead of a token, add:
+      #   id-token: write
+      # then remove the `user`/`password` inputs below and configure the
+      # trusted publisher on PyPI (project settings -> Publishing).
+    steps:
+      - name: Download distribution artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
 
+  # ---------------------------------------------------------------------------
+  # 3) Publish server metadata to the MCP Registry (server.json).
+  #    Independent of the MCPB build; can be re-run on its own.
+  # ---------------------------------------------------------------------------
+  publish-registry:
+    needs: [verify, publish-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # github-oidc login to the MCP Registry
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Wait for PyPI availability
+        run: |
+          VERSION="${{ needs.verify.outputs.version }}"
+          for i in $(seq 1 30); do
+            if pip download --no-deps --dest /tmp/wbcheck "webull-openapi-mcp==$VERSION" >/dev/null 2>&1; then
+              echo "webull-openapi-mcp==$VERSION is installable from PyPI"; exit 0
+            fi
+            echo "Not on PyPI yet, retry $i/30..."; sleep 20
+          done
+          echo "::error::Timed out waiting for PyPI to serve $VERSION"; exit 1
+
       - name: Install mcp-publisher
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          if [ "${MCP_PUBLISHER_REF}" = "latest" ]; then
+            URL="https://github.com/modelcontextprotocol/registry/releases/latest/download"
+          else
+            URL="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_REF}"
+          fi
+          curl -L "${URL}/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
       - name: Sync version into server.json
         run: |
-          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
-          echo "server.json version synced to $VERSION"
+          jq --arg v "${{ needs.verify.outputs.version }}" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
+          echo "server.json synced to ${{ needs.verify.outputs.version }}"
+          # Fail fast if server.json is not valid JSON after the edit.
+          jq empty server.json
 
       - name: Authenticate to MCP Registry
         run: ./mcp-publisher login github-oidc
 
       - name: Publish server to MCP Registry
         run: ./mcp-publisher publish
+
+  # ---------------------------------------------------------------------------
+  # 4) Build the MCPB bundles from the published PyPI release.
+  #    Emits both bundles as an artifact for the distribution jobs.
+  # ---------------------------------------------------------------------------
+  build-mcpb:
+    needs: [verify, publish-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Wait for PyPI availability
+        run: |
+          VERSION="${{ needs.verify.outputs.version }}"
+          for i in $(seq 1 30); do
+            if pip download --no-deps --dest /tmp/wbcheck "webull-openapi-mcp==$VERSION" >/dev/null 2>&1; then
+              echo "webull-openapi-mcp==$VERSION is installable from PyPI"; exit 0
+            fi
+            echo "Not on PyPI yet, retry $i/30..."; sleep 20
+          done
+          echo "::error::Timed out waiting for PyPI to serve $VERSION"; exit 1
+
+      - name: Build .mcpb bundles
+        run: |
+          chmod +x mcpb/build.sh
+          PYTHON=python ./mcpb/build.sh "${{ needs.verify.outputs.version }}"
+
+      - name: Upload MCPB bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcpb-bundles
+          path: |
+            mcpb/webull-openapi-mcp.mcpb
+            mcpb/webull-openapi-mcp.smithery.mcpb
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # 5) Attach the Claude Desktop bundle to a GitHub Release.
+  # ---------------------------------------------------------------------------
+  github-release:
+    needs: [verify, build-mcpb]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create/upload the release asset
+    steps:
+      - name: Download MCPB bundles
+        uses: actions/download-artifact@v4
+        with:
+          name: mcpb-bundles
+          path: mcpb/
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG="${{ needs.verify.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" mcpb/webull-openapi-mcp.mcpb --clobber
+          else
+            gh release create "$TAG" mcpb/webull-openapi-mcp.mcpb \
+              --title "$TAG" \
+              --notes "Webull OpenAPI MCP .mcpb bundle ($TAG). Install in Claude Desktop by double-clicking the file, or via Smithery."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # 6) Publish the Smithery bundle. Skipped until SMITHERY_API_KEY is set.
+  #    NOTE: verify auth on first run — if the CLI does not pick up
+  #    SMITHERY_API_KEY, add a `smithery auth login` with the token first.
+  # ---------------------------------------------------------------------------
+  publish-smithery:
+    needs: build-mcpb
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
+    steps:
+      - name: Download MCPB bundles
+        uses: actions/download-artifact@v4
+        with:
+          name: mcpb-bundles
+          path: mcpb/
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Publish to Smithery
+        if: ${{ env.SMITHERY_API_KEY != '' }}
+        run: |
+          npx -y "smithery@${SMITHERY_VERSION}" mcp publish ./mcpb/webull-openapi-mcp.smithery.mcpb -n "$SMITHERY_TARGET"
