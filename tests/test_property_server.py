@@ -119,13 +119,17 @@ def test_property13_sdk_exception_via_registered_tool():
     register_order_tools(mcp, sdk, audit)
 
     # Get the registered tool function via public API
-    tool = asyncio.get_event_loop().run_until_complete(mcp.get_tool("cancel_order"))
-    assert tool is not None, "cancel_order tool not registered"
+    loop = asyncio.new_event_loop()
+    try:
+        tool = loop.run_until_complete(mcp.get_tool("cancel_order"))
+        assert tool is not None, "cancel_order tool not registered"
 
-    with _patch_exceptions():
-        result = asyncio.get_event_loop().run_until_complete(
-            tool.fn(account_id="a1", client_order_id="o1")
-        )
+        with _patch_exceptions():
+            result = loop.run_until_complete(
+                tool.fn(account_id="a1", client_order_id="o1")
+            )
+    finally:
+        loop.close()
     assert isinstance(result, str)
     assert "SDK boom" in result or "Server error" in result
 
@@ -191,12 +195,16 @@ def test_property14_via_registered_stock_snapshot():
     register_stock_market_data_tools(mcp, sdk, audit, config)
 
     # Get the registered tool function via public API
-    tool = asyncio.get_event_loop().run_until_complete(mcp.get_tool("get_stock_snapshot"))
+    loop = asyncio.new_event_loop()
+    try:
+        tool = loop.run_until_complete(mcp.get_tool("get_stock_snapshot"))
 
-    with _patch_exceptions():
-        result = asyncio.get_event_loop().run_until_complete(
-            tool.fn(symbols="AAPL")
-        )
+        with _patch_exceptions():
+            result = loop.run_until_complete(
+                tool.fn(symbols="AAPL")
+            )
+    finally:
+        loop.close()
     assert _get_market_data_hint("us") in result
 
 
@@ -247,7 +255,11 @@ def test_jp_region_registers_expected_tool_subset():
     from webull_openapi_mcp.server import build_server
 
     server = build_server(_config(region_id="jp"))
-    tools = asyncio.get_event_loop().run_until_complete(server.list_tools())
+    loop = asyncio.new_event_loop()
+    try:
+        tools = loop.run_until_complete(server.list_tools())
+    finally:
+        loop.close()
     names = {tool.name for tool in tools}
 
     assert "get_account_position_details" in names
@@ -287,7 +299,11 @@ def test_stock_order_schema_uses_string_account_id():
 
     register_stock_order_tools(mcp, sdk, audit, config)
 
-    tool = asyncio.get_event_loop().run_until_complete(mcp.get_tool("place_stock_order"))
+    loop = asyncio.new_event_loop()
+    try:
+        tool = loop.run_until_complete(mcp.get_tool("place_stock_order"))
+    finally:
+        loop.close()
     schema = tool.parameters["properties"]["account_id"]
     types = _schema_types(schema)
 
@@ -309,7 +325,11 @@ def test_stock_order_schema_exposes_jp_enum_values():
 
     register_stock_order_tools(mcp, sdk, audit, config)
 
-    tool = asyncio.get_event_loop().run_until_complete(mcp.get_tool("place_stock_order"))
+    loop = asyncio.new_event_loop()
+    try:
+        tool = loop.run_until_complete(mcp.get_tool("place_stock_order"))
+    finally:
+        loop.close()
     account_tax_type_schema = tool.parameters["properties"]["account_tax_type"]
     margin_type_schema = tool.parameters["properties"]["margin_type"]
     position_intent_schema = tool.parameters["properties"]["position_intent"]
@@ -354,7 +374,11 @@ def test_preview_stock_order_schema_exposes_jp_enum_values():
 
     register_stock_order_tools(mcp, sdk, audit, config)
 
-    tool = asyncio.get_event_loop().run_until_complete(mcp.get_tool("preview_stock_order"))
+    loop = asyncio.new_event_loop()
+    try:
+        tool = loop.run_until_complete(mcp.get_tool("preview_stock_order"))
+    finally:
+        loop.close()
     account_tax_type_schema = tool.parameters["properties"]["account_tax_type"]
     margin_type_schema = tool.parameters["properties"]["margin_type"]
 
@@ -386,7 +410,11 @@ def test_cancel_order_schema_uses_string_account_id():
 
     register_order_tools(mcp, sdk, audit)
 
-    tool = asyncio.get_event_loop().run_until_complete(mcp.get_tool("cancel_order"))
+    loop = asyncio.new_event_loop()
+    try:
+        tool = loop.run_until_complete(mcp.get_tool("cancel_order"))
+    finally:
+        loop.close()
     schema = tool.parameters["properties"]["account_id"]
     types = _schema_types(schema)
 
@@ -407,7 +435,11 @@ def test_place_stock_order_schema_uses_string_account_id():
 
     register_stock_order_tools(mcp, sdk, audit, config)
 
-    tool = asyncio.get_event_loop().run_until_complete(mcp.get_tool("place_stock_order"))
+    loop = asyncio.new_event_loop()
+    try:
+        tool = loop.run_until_complete(mcp.get_tool("place_stock_order"))
+    finally:
+        loop.close()
     schema = tool.parameters["properties"]["account_id"]
     types = _schema_types(schema)
 
