@@ -306,3 +306,79 @@ def register_instrument_tools(
                 return prepend_disclaimer(format_event_events(data))
             except Exception as e:
                 return handle_sdk_exception(e, "get_event_events")
+
+    if region_config.region_id in ("us", "hk", "jp"):
+        @mcp.tool(
+            description=(
+                "Get option contract list by underlying symbols and filters.\n"
+                "Supported regions: US, HK, JP. category: US_OPTION.\n"
+                "underlying_symbols: Comma-separated underlying symbols, e.g. AAPL,MSFT.\n"
+                "option_type: CALL or PUT (optional).\n"
+                "start_date/end_date: Expiration date range, format YYYY-MM-DD.\n"
+                "strike_price_gte/strike_price_lte: Strike price range filter.\n"
+                "status: LISTING (default), DELISTING.\n"
+                "page_size: Default 10, max 1000.\n"
+                "Returns: option_symbol, underlying_symbol, option_type, strike_price, "
+                "expiration_date, style, status."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_option_contracts(
+            underlying_symbols: str,
+            category: str = "US_OPTION",
+            option_type: Optional[str] = None,
+            status: Optional[str] = None,
+            start_date: Optional[str] = None,
+            end_date: Optional[str] = None,
+            root_symbol: Optional[str] = None,
+            option_symbol: Optional[str] = None,
+            style: Optional[str] = None,
+            strike_price_gte: Optional[str] = None,
+            strike_price_lte: Optional[str] = None,
+            page_size: int = 10,
+            last_instrument_id: Optional[str] = None,
+        ) -> str:
+            """Get option contract list by underlying symbols and filters."""
+            audit.log_tool_call("get_option_contracts", {"underlying_symbols": underlying_symbols})
+            try:
+                kwargs = _build_kwargs(
+                    {"category": category},
+                    underlying_symbols=underlying_symbols,
+                    status=status,
+                    start_date=start_date,
+                    end_date=end_date,
+                    root_symbol=root_symbol,
+                    option_symbol=option_symbol,
+                    option_type=option_type,
+                    style=style,
+                    strike_price_gte=strike_price_gte,
+                    strike_price_lte=strike_price_lte,
+                    page_size=page_size,
+                    last_instrument_id=last_instrument_id,
+                )
+                data = extract_response_data(sdk.data.instrument.get_option_contracts(**kwargs))
+                return prepend_disclaimer(_format_option_contracts(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_option_contracts")
+
+
+def _format_option_contracts(data) -> str:
+    """Format option contracts list."""
+    if not data:
+        return "No option contracts found."
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        return str(data)
+    lines = [f"=== Option Contracts ({len(data)} results) ==="]
+    for item in data:
+        lines.append(
+            f"  Symbol: {item.get('symbol', 'N/A')}  "
+            f"Underlying: {item.get('underlying_symbol', 'N/A')}  "
+            f"Type: {item.get('option_type', 'N/A')}  "
+            f"Strike: {item.get('strike_price', 'N/A')}  "
+            f"Expiration: {item.get('init_exp_date', item.get('expiration_date', 'N/A'))}  "
+            f"Style: {item.get('style', 'N/A')}  "
+            f"Status: {item.get('status', 'N/A')}"
+        )
+    return "\n".join(lines)
