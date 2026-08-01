@@ -137,6 +137,10 @@ def _register_tools(
             from webull_openapi_mcp.tools import register_event_market_data_tools
             register_event_market_data_tools(mcp, sdk, audit, config)
 
+        if region_config.region_id in ("us", "hk", "jp"):
+            from webull_openapi_mcp.tools import register_option_market_data_tools
+            register_option_market_data_tools(mcp, sdk, audit, config)
+
     # Trading tools (includes order query, place, replace, cancel)
     if _is_toolset_enabled(config, "trading"):
         register_order_tools(mcp, sdk, audit)

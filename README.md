@@ -20,7 +20,7 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full disclaimer.
 ## Features
 
 - **Multi-Region Support** — US, HK, JP, SG, TH, MY, UK, MX, BR, EU, ZA, and AU regions with region-specific order types, trading sessions, and validation
-- **Market Data** — Real-time snapshots, tick data, quotes (depth), footprint, and OHLCV bars for stocks, futures, crypto, and event contracts
+- **Market Data** — Real-time snapshots, tick data, quotes (depth), footprint, and OHLCV bars for stocks, options, futures, crypto, and event contracts
 - **NOII Data** — Net Order Imbalance Indicator bars and snapshots for US stock opening/closing auctions
 - **Screener** — Top gainers/losers, most active, market sectors, high dividend, and 52-week high/low rankings
 - **Watchlist** — Create, manage, and query user watchlists and instruments
@@ -91,6 +91,12 @@ Here are some prompts you can use with your AI assistant:
 **Options Trading**
 - Buy 1 AAPL call option, strike $250, expiring 2026-04-17, limit price $5.00
 - Buy 1 TSLA put option, strike $200, expiring 2026-05-15
+
+**Option Market Data**
+- Get a snapshot for AAPL260522C00300000
+- Show me tick data for TSLA251219C00450000
+- Get daily bars for AAPL260522C00300000
+- List available option contracts for AAPL expiring after 2026-06-01
 
 **Order Management**
 - Show me my order history for the last 7 days
@@ -301,6 +307,7 @@ See [.env.example](.env.example) for full configuration template.
 | **Stock** | `get_stock_tick`, `get_stock_snapshot`, `get_stock_quotes`, `get_stock_footprint`, `get_stock_bars`, `get_stock_bars_single`, `get_stock_noii_bars`, `get_stock_noii_snapshot` | All |
 | **Futures** | `get_futures_tick`, `get_futures_snapshot`, `get_futures_depth`, `get_futures_bars`, `get_futures_footprint` | US, HK |
 | **Crypto** | `get_crypto_snapshot`, `get_crypto_bars` | US |
+| **Option** | `get_option_tick`, `get_option_snapshot`, `get_option_bars` | US, HK, JP |
 | **Event** | `get_event_tick`, `get_event_snapshot`, `get_event_depth`, `get_event_bars` | US |
 | **Screener** | `get_gainers_losers`, `get_most_active` | All |
 | **Screener (Sectors/Dividend/52W)** | `get_market_sectors`, `get_market_sectors_detail`, `get_high_dividend`, `get_52_week_high_low` | US, HK, JP |
@@ -310,7 +317,7 @@ See [.env.example](.env.example) for full configuration template.
 
 | Category | Tools | Region |
 |----------|-------|--------|
-| **Instrument** | `get_instruments`, `get_futures_instruments`, `get_futures_products`, `get_crypto_instruments`, `get_event_series`, `get_event_instruments`, `get_event_categories`, `get_event_events` | varies |
+| **Instrument** | `get_instruments`, `get_option_contracts`, `get_futures_instruments`, `get_futures_products`, `get_crypto_instruments`, `get_event_series`, `get_event_instruments`, `get_event_categories`, `get_event_events` | varies |
 | **Fundamental** | `get_company_profile`, `get_analyst_rating`, `get_analyst_target_price` | All |
 | **Stock Fundamentals** | `get_stock_capital_flow`, `get_stock_filings`, `get_stock_earnings_calendar`, `get_stock_dividend_calendar`, `get_stock_forecast_eps`, `get_stock_industry_comparison` | US, HK, JP |
 | **Fund Fundamentals** | `get_fund_rating`, `get_fund_performance`, `get_fund_allocation`, `get_fund_holdings`, `get_fund_brief`, `get_fund_dividends`, `get_fund_splits`, `get_fund_net_value`, `get_fund_files` | US, HK, JP |
@@ -403,7 +410,7 @@ All commands accept `--env-file PATH` to specify a custom `.env` file location (
 - **Review before trading** — Always review order details proposed by the AI before confirming. Use `preview_stock_order` / `preview_option_order` before placing orders.
 - **Use toolset filtering** — Set `WEBULL_TOOLSETS=account,market-data` to disable trading tools entirely if you only need read-only access. Valid toolsets: `account`, `market-data`, `trading`, `instrument`.
 - **Default sandbox** — The server defaults to UAT (sandbox) environment. You must explicitly set `WEBULL_ENVIRONMENT=prod` for live trading.
-- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `2.0.12`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
+- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `2.0.16`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
 
 ---
 
@@ -496,6 +503,7 @@ webull-openapi-mcp/
 │       ├── __init__.py     # Tool registration exports
 │       ├── market_data/
 │       │   ├── stock.py    # Stock market data (snapshot, quotes, bars, tick, footprint, NOII)
+│       │   ├── option.py   # Option market data (tick, snapshot, bars)
 │       │   ├── futures.py  # Futures market data
 │       │   ├── crypto.py   # Crypto market data
 │       │   ├── event.py    # Event contract market data

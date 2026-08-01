@@ -14,7 +14,7 @@ import uuid
 from typing import TYPE_CHECKING, Optional
 
 from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
-from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data, format_decimal
+from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data, format_decimal, format_order_preview
 from webull_openapi_mcp.guards import validate_client_order_id, validate_stock_order
 from webull_openapi_mcp.region_config import get_region_config
 from webull_openapi_mcp.tools.trading.account import (
@@ -215,6 +215,79 @@ def register_futures_order_tools(
                 client_order_id=coid, success=False, response={"error": str(e)},
             )
             return handle_sdk_exception(e, "place_futures_order")
+
+    @mcp.tool(
+        description=(
+            "Preview a futures order without submitting. Shows estimated costs and fees.\n"
+            "Account: Futures account. Call get_account_list first.\n"
+            "order_type: MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT.\n"
+            "Returns: estimated commission, margin requirements, buying power impact."
+        ),
+        annotations={"readOnlyHint": True},
+    )
+    async def preview_futures_order(
+        symbol: str,
+        side: str,
+        order_type: str,
+        time_in_force: str,
+        quantity: float,
+        market: Optional[str] = _default_market,
+        account_id: Optional[str] = None,
+        limit_price: Optional[float] = None,
+        stop_price: Optional[float] = None,
+    ) -> str:
+        """Preview a futures order without submitting."""
+        audit.log_tool_call("preview_futures_order", {"symbol": symbol, "side": side, "market": market})
+
+        # Validate market parameter
+        if market is None:
+            return (
+                f"Validation error: market is required for {config.region_id.upper()} region. "
+                f"Valid values: {', '.join(sorted(valid_futures_markets))}."
+            )
+        market = market.upper()
+        if market not in valid_futures_markets:
+            return (
+                f"Validation error: Invalid market '{market}' for {config.region_id.upper()} region. "
+                f"Valid values: {', '.join(sorted(valid_futures_markets))}"
+            )
+
+        # Auto-resolve account_id
+        try:
+            region_cfg = get_region_config(config.region_id)
+            account_id = await resolve_account_id(sdk, "futures", account_id, region_cfg)
+        except ValueError as e:
+            return f"Account error: {e}"
+
+        params: dict = {
+            "side": side, "order_type": order_type, "time_in_force": time_in_force,
+            "quantity": quantity, "symbol": symbol, "market": market,
+        }
+        if limit_price is not None:
+            params["limit_price"] = limit_price
+        if stop_price is not None:
+            params["stop_price"] = stop_price
+        try:
+            validate_stock_order(params, config)
+        except ValidationError as e:
+            return f"Validation error: {e.message}"
+
+        coid = _generate_client_order_id()
+        order = _build_futures_order(
+            symbol=symbol, side=side, order_type=order_type,
+            time_in_force=time_in_force, quantity=quantity, coid=coid,
+            limit_price=limit_price, stop_price=stop_price,
+            market=market,
+        )
+
+        try:
+            response = sdk.trade.order_v3.preview_order(
+                account_id=account_id, preview_orders=[order],
+            )
+            data = extract_response_data(response)
+            return prepend_disclaimer(format_order_preview(data if isinstance(data, dict) else {}))
+        except Exception as e:
+            return handle_sdk_exception(e, "preview_futures_order")
 
     @mcp.tool(description=_replace_desc)
     async def replace_futures_order(
