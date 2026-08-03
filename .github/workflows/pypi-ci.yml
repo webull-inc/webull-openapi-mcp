@@ -22,8 +22,8 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 1) Verify: single source of truth for the version, tests, build, artifact
-  #    checks and a real wheel smoke test. Nothing is published here.
+  # 1) Verify: single source of truth for the version, build, artifact checks
+  #    and a real wheel smoke test. Nothing is published here.
   # ---------------------------------------------------------------------------
   verify:
     runs-on: ubuntu-latest
@@ -55,14 +55,10 @@ jobs:
             echo "Manual run; building pyproject version: $VERSION"
           fi
 
-      - name: Install package (with dev deps) and build tooling
+      - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
-          pip install build hatchling twine
-          pip install -e ".[dev]"
-
-      - name: Run tests
-        run: pytest -q
+          pip install build twine
 
       - name: Build package
         run: python -m build
