@@ -57,27 +57,31 @@ def register_instrument_tools(
             "Get stock/ETF instrument info.\n"
             "Two modes: (1) Query by symbols — pass symbols, no pagination needed. "
             "(2) Query by category — omit symbols, use page_size/last_instrument_id for pagination.\n"
-            "category: US_STOCK, US_ETF, HK_STOCK, CN_STOCK.\n"
+            "category: US_STOCK, HK_STOCK, JP_STOCK, CN_STOCK.\n"
+            "sub_category: optional sub-classification filter within the category "
+            "(e.g. COMMON_STOCK, ETF, PREFERRED_STOCK, WARRANT, UNITS, RIGHT).\n"
             "status: OC (Tradable), CO (Liquidate only), NT (Non-Tradable).\n"
-            "Returns: symbol, name, instrument_type, exchange."
+            "Returns: symbol, name, instrument_type, exchange, sub_category."
         ),
         annotations={"readOnlyHint": True},
     )
     async def get_instruments(
         symbols: Optional[str] = None,
         category: str = "US_STOCK",
+        sub_category: Optional[str] = None,
         status: Optional[str] = None,
         page_size: int = 1000,
         last_instrument_id: Optional[str] = None,
     ) -> str:
         """Get stock/ETF instrument information. Query by symbols or paginate by category."""
-        audit.log_tool_call("get_instruments", {"symbols": symbols, "category": category})
+        audit.log_tool_call("get_instruments", {"symbols": symbols, "category": category, "sub_category": sub_category})
         if region_config.region_id in ("jp", "sg") and category not in region_config.valid_instrument_categories:
             return f"Validation error: {region_config.region_id.upper()} region instrument lookup only supports US_STOCK and US_ETF"
         try:
             kwargs = _build_kwargs(
                 {"category": category},
                 symbols=_split_symbols(symbols) if symbols else None,
+                sub_category=sub_category,
                 status=status,
                 page_size=page_size if page_size != 1000 else None,
                 last_instrument_id=last_instrument_id,

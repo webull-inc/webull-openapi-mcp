@@ -3,7 +3,7 @@
 Provides:
 - register_screener_tools: gainers/losers, most active (all regions).
 - register_extended_screener_tools: market sectors, market sector detail,
-  high dividend, 52-week high/low. US / HK / JP only.
+  high dividend, 52-week high/low. All regions.
 """
 
 from __future__ import annotations

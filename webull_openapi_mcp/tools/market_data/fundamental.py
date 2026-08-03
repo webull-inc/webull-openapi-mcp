@@ -5,7 +5,7 @@ Provides:
 - register_extended_fundamental_tools: stock fundamentals (capital flow, SEC
   filings, earnings/dividend calendar, forecast EPS, industry comparison) and
   fund fundamentals (rating, performance, allocation, holdings, brief, dividends,
-  splits, net value, files). US / HK / JP only.
+  splits, net value, files). All regions.
 """
 
 from __future__ import annotations

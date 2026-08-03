@@ -1,7 +1,7 @@
 """Financial statement tools for Webull MCP Server.
 
 Provides: get_financial_alert, get_financial_indicators, get_income_statement,
-get_balance_sheet, get_cash_flow.
+get_balance_sheet, get_cash_flow. All regions.
 """
 
 from __future__ import annotations
