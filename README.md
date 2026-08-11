@@ -25,8 +25,8 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full disclaimer.
 - **Screener** — Top gainers/losers, most active, market sectors, high dividend, and 52-week high/low rankings
 - **Watchlist** — Create, manage, and query user watchlists and instruments
 - **Fundamental Data** — Company profiles, analyst ratings, and target prices
-- **Stock & Fund Fundamentals** — Capital flow, SEC filings, earnings/dividend calendar, forecast EPS, industry comparison, and full fund data (rating, performance, allocation, holdings, brief, dividends, splits, net value, files) (US/HK/JP only)
-- **Financial Statements** — Financial alert, indicators, income statement, balance sheet, and cash flow (US/HK/JP only)
+- **Stock & Fund Fundamentals** — Capital flow, SEC filings, earnings/dividend calendar, forecast EPS, industry comparison, and full fund data (rating, performance, allocation, holdings, brief, dividends, splits, net value, files)
+- **Financial Statements** — Financial alert, indicators, income statement, balance sheet, and cash flow
 - **Trading** — Place, modify, cancel orders for stocks, options, futures, crypto, and event contracts
 - **Combo Orders** — OTO, OCO, OTOCO combo orders (US only)
 - **Option Strategies** — Multi-leg option strategies: vertical, straddle, strangle, butterfly, condor, etc. (US only)
@@ -302,15 +302,14 @@ See [.env.example](.env.example) for full configuration template.
 
 ### Market Data
 
-| Category | Tools | Region |
-|----------|-------|--------|
-| **Stock** | `get_stock_tick`, `get_stock_snapshot`, `get_stock_quotes`, `get_stock_footprint`, `get_stock_bars`, `get_stock_bars_single`, `get_stock_noii_bars`, `get_stock_noii_snapshot` | All |
-| **Futures** | `get_futures_tick`, `get_futures_snapshot`, `get_futures_depth`, `get_futures_bars`, `get_futures_footprint` | US, HK |
-| **Crypto** | `get_crypto_snapshot`, `get_crypto_bars` | US |
-| **Option** | `get_option_tick`, `get_option_snapshot`, `get_option_bars` | US, HK, JP |
-| **Event** | `get_event_tick`, `get_event_snapshot`, `get_event_depth`, `get_event_bars` | US |
-| **Screener** | `get_gainers_losers`, `get_most_active` | All |
-| **Screener (Sectors/Dividend/52W)** | `get_market_sectors`, `get_market_sectors_detail`, `get_high_dividend`, `get_52_week_high_low` | US, HK, JP |
+| Category | Tools                                                                                                                                                                                                  | Region |
+|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------|
+| **Stock** | `get_stock_tick`, `get_stock_snapshot`, `get_stock_quotes`, `get_stock_footprint`, `get_stock_bars`, `get_stock_bars_single`, `get_stock_noii_bars`, `get_stock_noii_snapshot`                         | All |
+| **Futures** | `get_futures_tick`, `get_futures_snapshot`, `get_futures_depth`, `get_futures_bars`, `get_futures_footprint`                                                                                           | US, HK |
+| **Crypto** | `get_crypto_snapshot`, `get_crypto_bars`                                                                                                                                                               | US |
+| **Option** | `get_option_tick`, `get_option_snapshot`, `get_option_bars`                                                                                                                                            | US, HK, JP |
+| **Event** | `get_event_tick`, `get_event_snapshot`, `get_event_depth`, `get_event_bars`                                                                                                                            | US |
+| **Screener** | `get_gainers_losers`, `get_most_active`, `get_market_sectors`, `get_market_sectors_detail`, `get_high_dividend`, `get_52_week_high_low`                                                                                                                                                              | All |
 | **Watchlist** | `get_watchlists`, `create_watchlist`, `update_watchlist`, `delete_watchlist`, `get_watchlist_instruments`, `add_watchlist_instruments`, `remove_watchlist_instruments`, `update_watchlist_instruments` | All |
 
 ### Fundamental & Instrument
@@ -319,9 +318,9 @@ See [.env.example](.env.example) for full configuration template.
 |----------|-------|--------|
 | **Instrument** | `get_instruments`, `get_option_contracts`, `get_futures_instruments`, `get_futures_products`, `get_crypto_instruments`, `get_event_series`, `get_event_instruments`, `get_event_categories`, `get_event_events` | varies |
 | **Fundamental** | `get_company_profile`, `get_analyst_rating`, `get_analyst_target_price` | All |
-| **Stock Fundamentals** | `get_stock_capital_flow`, `get_stock_filings`, `get_stock_earnings_calendar`, `get_stock_dividend_calendar`, `get_stock_forecast_eps`, `get_stock_industry_comparison` | US, HK, JP |
-| **Fund Fundamentals** | `get_fund_rating`, `get_fund_performance`, `get_fund_allocation`, `get_fund_holdings`, `get_fund_brief`, `get_fund_dividends`, `get_fund_splits`, `get_fund_net_value`, `get_fund_files` | US, HK, JP |
-| **Financial Statements** | `get_financial_alert`, `get_financial_indicators`, `get_income_statement`, `get_balance_sheet`, `get_cash_flow` | US, HK, JP |
+| **Stock Fundamentals** | `get_stock_capital_flow`, `get_stock_filings`, `get_stock_earnings_calendar`, `get_stock_dividend_calendar`, `get_stock_forecast_eps`, `get_stock_industry_comparison` | All |
+| **Fund Fundamentals** | `get_fund_rating`, `get_fund_performance`, `get_fund_allocation`, `get_fund_holdings`, `get_fund_brief`, `get_fund_dividends`, `get_fund_splits`, `get_fund_net_value`, `get_fund_files` | All |
+| **Financial Statements** | `get_financial_alert`, `get_financial_indicators`, `get_income_statement`, `get_balance_sheet`, `get_cash_flow` | All |
 
 ### Trading
 
@@ -341,31 +340,30 @@ See [.env.example](.env.example) for full configuration template.
 
 ### Region Differences
 
-| Feature | US | HK | JP | SG | TH | MY | UK | MX | BR | EU | ZA | AU |
-|---------|----|----|----|----|----|----|-----|----|----|----|----|-----|
-| Stock Trading | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Option Trading | Yes | Yes | No | No | No | No | No | No | No | No | No | No |
-| Futures Trading | Yes | Yes | No | No | No | No | No | No | No | No | No | No |
-| Crypto Trading | Yes | No | No | No | No | No | No | No | No | No | No | No |
-| Event Contracts | Yes | No | No | No | No | No | No | No | No | No | No | No |
-| Combo Orders | Yes | No | No | No | No | No | No | No | No | No | No | No |
-| Option Strategies | Yes | No | No | No | No | No | No | No | No | No | No | No |
-| Algo Orders | Yes | No | No | No | No | No | No | No | No | No | No | No |
-| Screener (Gainers/Losers/Active) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Screener (Sectors/Dividend/52W) | Yes | Yes | Yes | No | No | No | No | No | No | No | No | No |
-| Watchlist | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Feature                     | US | HK | JP | SG | TH | MY | UK | MX | BR | EU | ZA | AU |
+|-----------------------------|----|----|----|----|----|----|-----|----|----|----|----|-----|
+| Stock Trading               | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Option Trading              | Yes | Yes | No | No | No | No | No | No | No | No | No | No |
+| Futures Trading             | Yes | Yes | No | No | No | No | No | No | No | No | No | No |
+| Crypto Trading              | Yes | No | No | No | No | No | No | No | No | No | No | No |
+| Event Contracts             | Yes | No | No | No | No | No | No | No | No | No | No | No |
+| Combo Orders                | Yes | No | No | No | No | No | No | No | No | No | No | No |
+| Option Strategies           | Yes | No | No | No | No | No | No | No | No | No | No | No |
+| Algo Orders                 | Yes | No | No | No | No | No | No | No | No | No | No | No |
+| Screener                    | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Watchlist                   | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Fundamental (Company/Analyst) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Stock/Fund Fundamentals | Yes | Yes | Yes | No | No | No | No | No | No | No | No | No |
-| Financial Statements | Yes | Yes | Yes | No | No | No | No | No | No | No | No | No |
-| NOII (Auction Imbalance) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Markets | US | US, HK, CN | US, JP | US | US | US | US | US | US | US | US | US |
-| Instrument Categories | US_STOCK, US_ETF | US_STOCK, US_ETF, HK_STOCK, CN_STOCK | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF |
-| Order Types | LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT, TRAILING_STOP_LOSS, etc. | LIMIT, MARKET, ENHANCED_LIMIT, AT_AUCTION, AT_AUCTION_LIMIT, etc. | JP market: LIMIT, MARKET — US market: LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT |
-| Time-in-Force | DAY, GTC | US market: DAY, GTC, GTD — HK market: DAY, GTC — CN market: DAY | JP market: DAY — US market: DAY, GTC, GTD | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC |
-| Trading Sessions | ALL, CORE, NIGHT | CORE, ALL_DAY, NIGHT, ALL | CORE, ALL, NIGHT, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY |
-| JP Order Fields | — | — | `account_tax_type` required (GENERAL or SPECIFIC); `margin_type` (ONE_DAY or INDEFINITE) and `position_intent` optional margin-account-only fields; `close_contracts` optional | — | — | — | — | — | — | — | — | — |
+| Stock/Fund Fundamentals     | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Financial Statements        | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| NOII (Auction Imbalance)    | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Markets                     | US | US, HK, CN | US, JP | US | US | US | US | US | US | US | US | US |
+| Instrument Categories       | US_STOCK, US_ETF | US_STOCK, US_ETF, HK_STOCK, CN_STOCK | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF | US_STOCK, US_ETF |
+| Order Types                 | LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT, TRAILING_STOP_LOSS, etc. | LIMIT, MARKET, ENHANCED_LIMIT, AT_AUCTION, AT_AUCTION_LIMIT, etc. | JP market: LIMIT, MARKET — US market: LIMIT, MARKET, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT | MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT |
+| Time-in-Force               | DAY, GTC | US market: DAY, GTC, GTD — HK market: DAY, GTC — CN market: DAY | JP market: DAY — US market: DAY, GTC, GTD | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC | DAY, GTC |
+| Trading Sessions            | ALL, CORE, NIGHT | CORE, ALL_DAY, NIGHT, ALL | CORE, ALL, NIGHT, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY | NIGHT, ALL, CORE, ALL_DAY |
+| JP Order Fields             | — | — | `account_tax_type` required (GENERAL or SPECIFIC); `margin_type` (ONE_DAY or INDEFINITE) and `position_intent` optional margin-account-only fields; `close_contracts` optional | — | — | — | — | — | — | — | — | — |
 
-> **Note:** Screener (Gainers/Losers/Active), Fundamental (Company/Analyst), and NOII currently only support querying US stock data (`US_STOCK` category). Stock/Fund Fundamentals, Financial Statements, and the extended Screener (Sectors/Dividend/52W) are available in US, HK, and JP regions; supported `category` values vary by endpoint (commonly `US_STOCK`, `HK_STOCK`, `CN_STOCK`, `JP_STOCK`). Watchlist supports US stocks and HK stocks.
+> **Note:** Screener (Gainers/Losers/Active), Fundamental (Company/Analyst), and NOII currently only support querying US stock data (`US_STOCK` category). Stock/Fund Fundamentals, Financial Statements, and the extended Screener (Sectors/Dividend/52W) are available in all regions; supported `category` values vary by endpoint (commonly `US_STOCK`, `HK_STOCK`, `CN_STOCK`, `JP_STOCK`). Watchlist supports US stocks and HK stocks.
 
 ---
 
