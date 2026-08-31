@@ -128,6 +128,10 @@ def _build_stock_order(params: dict) -> dict:
     _add_optional_str(order, "position_intent", params.get("position_intent"))
     if params.get("close_contracts") is not None:
         order["close_contracts"] = params["close_contracts"]
+    # Option leg-in / leg-out fields (US only) — e.g. legging a stock leg out of a combo
+    _add_optional_str(order, "leg_in_or_out", params.get("leg_in_or_out"))
+    _add_optional_str(order, "position_id", params.get("position_id"))
+    _add_optional_str(order, "leg_in_strategy", params.get("leg_in_strategy"))
 
     return order
 
@@ -447,6 +451,10 @@ def register_stock_order_tools(
             "margin_type must be ONE_DAY or INDEFINITE and is margin-account-only; "
             "position_intent must be BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, or SELL_TO_CLOSE and is margin-account-only; "
             "close_contracts account eligibility is checked by the API backend.\n"
+            "Leg-in / leg-out (US only): use to leg a STOCK leg into/out of an option combo position. "
+            "leg_in_or_out=LEG_IN adds this stock leg to an existing position; LEG_OUT closes the stock leg from a multi-leg combo. "
+            "position_id (from Account Positions API) is required when leg_in_or_out is set. "
+            "leg_in_strategy (COVERED_STOCK/VERTICAL/STRADDLE/STRANGLE/CALENDAR/DIAGONAL) is required for LEG_IN, not allowed for LEG_OUT.\n"
             "Returns: {client_order_id, order_id}"
         ),
     )
@@ -472,6 +480,9 @@ def register_stock_order_tools(
         margin_type: Optional[MarginType] = None,
         position_intent: Optional[PositionIntent] = None,
         close_contracts: Optional[list[dict]] = None,
+        leg_in_or_out: Optional[str] = None,
+        position_id: Optional[str] = None,
+        leg_in_strategy: Optional[str] = None,
     ) -> str:
         """Place a single stock order (non-combo).
 
@@ -531,6 +542,27 @@ def register_stock_order_tools(
         except ValidationError as e:
             return f"Validation error: {e.message}"
 
+        # Leg-in / leg-out validation (US only) — e.g. legging a stock leg into/out of a combo
+        if leg_in_or_out is not None or position_id is not None or leg_in_strategy is not None:
+            from webull_openapi_mcp.constants import VALID_LEG_IN_OUT
+            if config.region_id != "us":
+                return "Validation error: leg-in / leg-out is only supported for US region"
+            if leg_in_or_out is None:
+                return "Validation error: leg_in_or_out is required when position_id or leg_in_strategy is provided"
+            if leg_in_or_out not in VALID_LEG_IN_OUT:
+                return (
+                    f"Validation error: Invalid leg_in_or_out '{leg_in_or_out}', "
+                    f"must be one of {sorted(VALID_LEG_IN_OUT)}"
+                )
+            if position_id is None:
+                return "Validation error: position_id is required when leg_in_or_out is specified"
+            if leg_in_or_out == "LEG_IN":
+                if leg_in_strategy is None:
+                    return "Validation error: leg_in_strategy is required when leg_in_or_out is LEG_IN"
+            else:  # LEG_OUT
+                if leg_in_strategy is not None:
+                    return "Validation error: leg_in_strategy is not allowed when leg_in_or_out is LEG_OUT"
+
         coid = client_order_id or _generate_client_order_id()
 
         order = _build_stock_order({
@@ -546,6 +578,9 @@ def register_stock_order_tools(
             "margin_type": margin_type,
             "position_intent": position_intent,
             "close_contracts": close_contracts,
+            "leg_in_or_out": leg_in_or_out,
+            "position_id": position_id,
+            "leg_in_strategy": leg_in_strategy,
         })
 
         audit.log_order_attempt(

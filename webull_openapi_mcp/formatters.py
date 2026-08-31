@@ -215,34 +215,86 @@ def format_account_balance(data: dict | None) -> str:
 
 def format_positions(data: list[dict] | None) -> str:
     """Format account positions response.
-    
-    API returns: [{position_id, currency, quantity, symbol, option_strategy,
-    instrument_type, last_price, cost_price, unrealized_profit_loss, legs: [...]}]
+
+    Top-level core (all regions): position_id, currency, quantity, symbol,
+    option_strategy, instrument_type, last_price, cost_price,
+    unrealized_profit_loss, legs: [...].
+    Top-level region-specific:
+    - US:  event_outcome (event orders only)
+    - JP:  available_quantity, market_value, symbol_name, exchange_code,
+           instrument_id, account_tax_type, base_currency, fx_rate,
+           base_currency_market_value
+
+    Leg fields differ by region:
+    - US:  side, quantity, market, instrument_type, symbol, strike_price,
+           option_expire_date, option_type (no leg_id)
+    - HK:  symbol, quantity, option_type, option_expire_date,
+           option_exercise_price, option_contract_multiplier,
+           option_contract_deliverable, expiration_type (no leg_id)
+    - JP:  same as HK plus leg_id
+
+    The formatter reads whichever fields are present so it works across regions.
     """
     if not data:
         return _NO_DATA
     lines: list[str] = ["=== Positions ==="]
     for pos in data:
-        lines.append(
-            f"  {_get(pos, 'symbol'):>8s}  "
-            f"Qty: {_get(pos, 'quantity'):>8s}  "
-            f"Type: {_get(pos, 'instrument_type'):>6s}  "
-            f"Cost: {_get(pos, 'cost_price'):>10s}  "
-            f"Last: {_get(pos, 'last_price'):>10s}  "
-            f"Unrealized P&L: {_get(pos, 'unrealized_profit_loss'):>10s}  "
-            f"Currency: {_get(pos, 'currency')}"
-        )
-        # Option legs
+        # Top-level fields — show only present fields (varies by region).
+        head_fields: list[tuple[str, str]] = [
+            ("Symbol", "symbol"),
+            ("Position ID", "position_id"),
+            ("Qty", "quantity"),
+            ("Available Qty", "available_quantity"),
+            ("Type", "instrument_type"),
+            ("Strategy", "option_strategy"),
+            ("Name", "symbol_name"),
+            ("Exchange", "exchange_code"),
+            ("Instrument ID", "instrument_id"),
+            ("Cost", "cost_price"),
+            ("Last", "last_price"),
+            ("Market Value", "market_value"),
+            ("Unrealized P&L", "unrealized_profit_loss"),
+            ("Currency", "currency"),
+            ("Event Outcome", "event_outcome"),
+            ("Tax Type", "account_tax_type"),
+            ("Base Currency", "base_currency"),
+            ("FX Rate", "fx_rate"),
+            ("Base Market Value", "base_currency_market_value"),
+        ]
+        head_parts = [
+            f"{label}: {pos[key]}"
+            for label, key in head_fields
+            if pos.get(key) is not None
+        ]
+        lines.append("  " + "  ".join(head_parts))
+
+        # Option legs — field set varies by region; show only present fields.
         legs = pos.get("legs", [])
         for leg in legs:
-            lines.append(
-                f"{'':>10s}  "
-                f"Leg: {_get(leg, 'symbol')}  "
-                f"Qty: {_get(leg, 'quantity')}  "
-                f"Type: {_get(leg, 'option_type')}  "
-                f"Strike: {_get(leg, 'option_exercise_price')}  "
-                f"Exp: {_get(leg, 'option_expire_date')}"
-            )
+            parts: list[str] = [f"Leg: {_get(leg, 'symbol')}"]
+            if leg.get("leg_id") is not None:
+                parts.append(f"Leg ID: {leg['leg_id']}")
+            if leg.get("side") is not None:
+                parts.append(f"Side: {leg['side']}")
+            parts.append(f"Qty: {_get(leg, 'quantity')}")
+            if leg.get("instrument_type") is not None:
+                parts.append(f"Type: {leg['instrument_type']}")
+            if leg.get("option_type") is not None:
+                parts.append(f"Option: {leg['option_type']}")
+            # Strike: US uses strike_price, HK/JP use option_exercise_price
+            strike = leg.get("strike_price") or leg.get("option_exercise_price")
+            if strike is not None:
+                parts.append(f"Strike: {strike}")
+            if leg.get("option_expire_date") is not None:
+                parts.append(f"Exp: {leg['option_expire_date']}")
+            # HK/JP-only option contract fields
+            if leg.get("option_contract_multiplier") is not None:
+                parts.append(f"Multiplier: {leg['option_contract_multiplier']}")
+            if leg.get("option_contract_deliverable") is not None:
+                parts.append(f"Deliverable: {leg['option_contract_deliverable']}")
+            if leg.get("expiration_type") is not None:
+                parts.append(f"ExpType: {leg['expiration_type']}")
+            lines.append(f"{'':>10s}  " + "  ".join(parts))
     return "\n".join(lines)
 
 
@@ -262,45 +314,38 @@ def format_position_details(data: list[dict] | dict | None) -> str:
     if not isinstance(data, list) or not data:
         return _NO_DATA
 
+    # Field labels in display order; only present fields are shown.
+    fields: list[tuple[str, str]] = [
+        ("Position ID", "id"),
+        ("Symbol", "symbol"),
+        ("Name", "symbol_name"),
+        ("Exchange", "exchange_code"),
+        ("Instrument ID", "instrument_id"),
+        ("Contract ID", "contract_id"),
+        ("Qty", "quantity"),
+        ("Hold Type", "hold_type"),
+        ("Margin Type", "margin_type"),
+        ("Average Price", "average_price"),
+        ("Market Value", "market_value"),
+        ("Unrealized P&L", "unrealized_pl"),
+        ("Currency", "currency"),
+        ("Account Tax Type", "account_tax_type"),
+        ("Base Currency", "base_currency"),
+        ("FX Rate", "fx_rate"),
+        ("Base Currency Market Value", "base_currency_market_value"),
+    ]
+
     lines: list[str] = ["=== Position Details ==="]
     for i, detail in enumerate(data, 1):
         if not isinstance(detail, dict):
             continue
         lines.append(f"\n[Position Detail {i}]")
-        lines.append(
-            f"  {_get(detail, 'symbol'):>8s}  "
-            f"Qty: {_get(detail, 'quantity'):>8s}  "
-            f"Hold: {_get(detail, 'hold_type'):>6s}  "
-            f"Market Value: {_get(detail, 'market_value'):>10s}  "
-            f"Currency: {_get(detail, 'currency')}"
-        )
-        lines.append(
-            f"{'':>10s}  "
-            f"Name: {_get(detail, 'symbol_name')}  "
-            f"Exchange: {_get(detail, 'exchange_code')}"
-        )
-        lines.append(
-            f"{'':>10s}  "
-            f"Average Price: {_get(detail, 'average_price'):>10s}  "
-            f"Unrealized P&L: {_get(detail, 'unrealized_pl'):>10s}"
-        )
-        lines.append(
-            f"{'':>10s}  "
-            f"Account Tax Type: {_get(detail, 'account_tax_type')}  "
-            f"Margin Type: {_get(detail, 'margin_type')}"
-        )
-        lines.append(
-            f"{'':>10s}  "
-            f"Instrument ID: {_get(detail, 'instrument_id')}  "
-            f"Contract ID: {_get(detail, 'contract_id')}  "
-            f"Position ID: {_get(detail, 'id')}"
-        )
-        lines.append(
-            f"{'':>10s}  "
-            f"Base Currency: {_get(detail, 'base_currency')}  "
-            f"FX Rate: {_get(detail, 'fx_rate')}  "
-            f"Base Currency Market Value: {_get(detail, 'base_currency_market_value')}"
-        )
+        parts = [
+            f"{label}: {detail[key]}"
+            for label, key in fields
+            if detail.get(key) is not None
+        ]
+        lines.append("  " + "  ".join(parts))
 
     if len(lines) == 1:
         return _NO_DATA

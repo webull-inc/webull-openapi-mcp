@@ -35,6 +35,9 @@ VALID_POSITION_INTENTS: frozenset[str] = frozenset({
     "SELL_TO_CLOSE",
 })
 
+# Option leg-in / leg-out values (US only)
+VALID_LEG_IN_OUT: frozenset[str] = frozenset({"LEG_IN", "LEG_OUT"})
+
 # Trading session types
 VALID_TRADING_SESSIONS: frozenset[str] = frozenset({"ALL", "CORE", "NIGHT"})
 

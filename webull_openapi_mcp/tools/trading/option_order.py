@@ -81,6 +81,9 @@ def _build_option_order(
     limit_price: float | None,
     stop_price: float | None,
     position_intent: str | None = None,
+    leg_in_or_out: str | None = None,
+    position_id: str | None = None,
+    leg_in_strategy: str | None = None,
 ) -> dict:
     """Build a single-leg option order dict for the SDK."""
     order: dict = {
@@ -109,6 +112,13 @@ def _build_option_order(
     _add_optional_str(order, "stop_price", stop_price)
     if position_intent is not None:
         order["position_intent"] = position_intent
+    # Option leg-in / leg-out fields (US only)
+    if leg_in_or_out is not None:
+        order["leg_in_or_out"] = leg_in_or_out
+    if position_id is not None:
+        order["position_id"] = position_id
+    if leg_in_strategy is not None:
+        order["leg_in_strategy"] = leg_in_strategy
     return order
 
 
@@ -237,6 +247,10 @@ def register_option_single_tools(
             "order_type: MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT.\n"
             "time_in_force: DAY, GTC. trading_session: CORE only.\n"
             "position_intent: BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, SELL_TO_CLOSE (optional, US only).\n"
+            "Leg-in / leg-out (US only, single-leg option): "
+            "leg_in_or_out=LEG_IN adds this leg to an existing position; LEG_OUT closes a leg from a multi-leg position. "
+            "position_id (from Account Positions API) is required when leg_in_or_out is set. "
+            "leg_in_strategy (COVERED_STOCK/VERTICAL/STRADDLE/STRANGLE/CALENDAR/DIAGONAL) is required for LEG_IN, not allowed for LEG_OUT.\n"
             "Returns: {client_order_id, order_id}"
         ),
     )
@@ -254,6 +268,9 @@ def register_option_single_tools(
         limit_price: Optional[float] = None,
         stop_price: Optional[float] = None,
         position_intent: Optional[str] = None,
+        leg_in_or_out: Optional[str] = None,
+        position_id: Optional[str] = None,
+        leg_in_strategy: Optional[str] = None,
     ) -> str:
         """Place a single-leg option order."""
         audit.log_tool_call("place_option_single_order", {"symbol": symbol, "side": side})
@@ -283,6 +300,27 @@ def register_option_single_tools(
                     f"must be one of {sorted(VALID_POSITION_INTENTS)}"
                 )
 
+        # Leg-in / leg-out validation (US only)
+        if leg_in_or_out is not None or position_id is not None or leg_in_strategy is not None:
+            from webull_openapi_mcp.constants import VALID_LEG_IN_OUT
+            if config.region_id != "us":
+                return "Validation error: leg-in / leg-out is only supported for US region"
+            if leg_in_or_out is None:
+                return "Validation error: leg_in_or_out is required when position_id or leg_in_strategy is provided"
+            if leg_in_or_out not in VALID_LEG_IN_OUT:
+                return (
+                    f"Validation error: Invalid leg_in_or_out '{leg_in_or_out}', "
+                    f"must be one of {sorted(VALID_LEG_IN_OUT)}"
+                )
+            if position_id is None:
+                return "Validation error: position_id is required when leg_in_or_out is specified"
+            if leg_in_or_out == "LEG_IN":
+                if leg_in_strategy is None:
+                    return "Validation error: leg_in_strategy is required when leg_in_or_out is LEG_IN"
+            else:  # LEG_OUT
+                if leg_in_strategy is not None:
+                    return "Validation error: leg_in_strategy is not allowed when leg_in_or_out is LEG_OUT"
+
         try:
             validate_client_order_id(client_order_id)
         except ValidationError as e:
@@ -297,6 +335,9 @@ def register_option_single_tools(
             time_in_force=time_in_force,
             limit_price=limit_price, stop_price=stop_price,
             position_intent=position_intent,
+            leg_in_or_out=leg_in_or_out,
+            position_id=position_id,
+            leg_in_strategy=leg_in_strategy,
         )
 
         audit.log_order_attempt(
