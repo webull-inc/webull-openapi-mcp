@@ -55,13 +55,6 @@ _DISCLAIMER_SG = (
     "Trading involves risk; please make decisions carefully.\n\n"
 )
 
-_DISCLAIMER_TH = (
-    "⚠️ Disclaimer: "
-    "The information provided by this tool is for reference only "
-    "and does not constitute investment advice. "
-    "Trading involves risk; please make decisions carefully.\n\n"
-)
-
 _DISCLAIMER_MY = (
     "⚠️ Disclaimer: "
     "The information provided by this tool is for reference only "
@@ -93,8 +86,6 @@ def set_disclaimer_region(region_id: str) -> None:
         DISCLAIMER = _DISCLAIMER_JP
     elif _current_region == "sg":
         DISCLAIMER = _DISCLAIMER_SG
-    elif _current_region == "th":
-        DISCLAIMER = _DISCLAIMER_TH
     elif _current_region == "my":
         DISCLAIMER = _DISCLAIMER_MY
     elif _current_region == "uk":
@@ -821,6 +812,62 @@ def format_order_detail(data: dict | None) -> str:
         return _NO_DATA
     lines: list[str] = ["=== Order Detail ==="]
     lines.extend(_format_order_item(data))
+    return "\n".join(lines)
+
+
+def _format_execution_item(item: dict) -> list[str]:
+    """Format a single execution record."""
+    return [
+        f"  Execution ID:       {_get(item, 'execution_id')}",
+        f"  Order ID:           {_get(item, 'order_id')}",
+        f"  Client Order ID:    {_get(item, 'client_order_id')}",
+        f"  Symbol:             {_get(item, 'symbol')}",
+        f"  Execution Time:     {_get(item, 'execution_time')}",
+        f"  Status:             {_get(item, 'status')}",
+        f"  Execution Type:     {_get(item, 'execution_type')}",
+        f"  Side:               {_get(item, 'side')}",
+        f"  Order Type:         {_get(item, 'order_type')}",
+        f"  Total Quantity:     {_get(item, 'total_quantity')}",
+        f"  Limit Price:        {_get(item, 'limit_price')}",
+        f"  Filled Quantity:    {_get(item, 'filled_quantity')}",
+        f"  Filled Price:       {_get(item, 'filled_price')}",
+        f"  Total Filled Qty:   {_get(item, 'total_filled_qty')}",
+        f"  Leaves Qty:         {_get(item, 'leaves_qty')}",
+    ]
+
+
+def format_order_executions(data: Any) -> str:
+    """Format order executions response.
+
+    API returns execution records under a ``data`` list, plus a top-level
+    ``pagination_key`` cursor for fetching the next page:
+    {"data": [{execution_id, order_id, client_order_id, symbol,
+               execution_time, status, execution_type, side, order_type,
+               total_quantity, limit_price, filled_quantity, filled_price,
+               total_filled_qty, leaves_qty}],
+     "pagination_key": "..."}
+    """
+    if not data:
+        return _NO_DATA
+
+    executions = data.get("data", []) if isinstance(data, dict) else data
+    if not executions or not isinstance(executions, list):
+        return _NO_DATA
+
+    lines: list[str] = ["=== Order Executions ==="]
+    for i, item in enumerate(executions, 1):
+        if not isinstance(item, dict):
+            continue
+        lines.append(f"\n[Execution {i}]")
+        lines.extend(_format_execution_item(item))
+
+    # Top-level pagination cursor. Pass this value back as pagination_key to
+    # fetch the next page. Present only when more records are available.
+    if isinstance(data, dict):
+        pagination_key = data.get("pagination_key") or data.get("next_pagination_key")
+        if pagination_key:
+            lines.append(f"\nNext pagination_key: {pagination_key}")
+
     return "\n".join(lines)
 
 

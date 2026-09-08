@@ -18,15 +18,12 @@ if TYPE_CHECKING:
 
 # Region-specific 2FA documentation links
 _2FA_GUIDE_LINKS: dict[str, str] = {
-    "au": "https://developer.webull.com.au/apis/docs/authentication/token",
     "br": "https://developer.webull.com.br/apis/docs/authentication/token",
-    "eu": "https://developer.webull.eu/apis/docs/authentication/token",
     "hk": "https://developer.webull.hk/apis/docs/authentication/token",
     "jp": "https://developer.webull.co.jp/apis/docs/authentication/token",
     "mx": "https://developer.webull.com.mx/apis/docs/authentication/token",
     "my": "https://developer.webull.com.my/apis/docs/authentication/token",
     "sg": "https://developer.webull.com.sg/apis/docs/authentication/token",
-    "th": "https://developer.webull.co.th/apis/docs/authentication/token",
     "uk": "https://developer.webull-uk.com/apis/docs/authentication/token",
     "us": "https://developer.webull.com/apis/docs/authentication/token",
     "za": "https://developer.webull.co.za/apis/docs/authentication/token",
@@ -141,7 +138,7 @@ class DeviceNotRegisteredError(Exception):
 # based on each request's api_type - no add_endpoint() calls needed.
 UAT_ENDPOINTS: dict = {
     "default_region": "us",
-    "regions": ["us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br", "eu", "za", "au"],
+    "regions": ["us", "hk", "jp", "sg", "my", "uk", "mx", "br", "za"],
     "region_mapping": {
         "us": {
             "api": "api.sandbox.webull.com",
@@ -163,11 +160,6 @@ UAT_ENDPOINTS: dict = {
             "quotes-api": "data-api.uat.webullbroker.com",
             "events-api": "sg-events-api.uat.webullbroker.com",
         },
-        "th": {
-            "api": "th-api.uat.webullbroker.com",
-            "quotes-api": "data-api.uat.webullbroker.com",
-            "events-api": "th-events-api.uat.webullbroker.com",
-        },
         "my": {
             "api": "my-api.uat.webullbroker.com",
             "quotes-api": "data-api.uat.webullbroker.com",
@@ -188,17 +180,7 @@ UAT_ENDPOINTS: dict = {
             "quotes-api": "us-openapi-quotes-api.uat.webullbroker.com",
             "events-api": "us-openapi-events.uat.webullbroker.com",
         },
-        "eu": {
-            "api": "eu-api.uat.webullbroker.com",
-            "quotes-api": "eu-api.uat.webullbroker.com",
-            "events-api": "eu-events-api.uat.webullbroker.com",
-        },
         "za": {
-            "api": "au-api.uat.webullbroker.com",
-            "quotes-api": "au-api.uat.webullbroker.com",
-            "events-api": "au-events-api.uat.webullbroker.com",
-        },
-        "au": {
             "api": "au-api.uat.webullbroker.com",
             "quotes-api": "au-api.uat.webullbroker.com",
             "events-api": "au-events-api.uat.webullbroker.com",

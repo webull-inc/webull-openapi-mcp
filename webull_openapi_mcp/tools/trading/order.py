@@ -16,6 +16,7 @@ from webull_openapi_mcp.formatters import (
     extract_response_data,
     format_open_orders,
     format_order_detail,
+    format_order_executions,
     format_order_history,
     prepend_disclaimer,
 )
@@ -173,3 +174,61 @@ def register_order_tools(
             return prepend_disclaimer(format_order_detail(data))
         except Exception as e:
             return handle_sdk_exception(e, "get_order_detail")
+
+    @mcp.tool(
+        description=(
+            "List order execution records within a date range. "
+            "Returns per execution: execution_id, order_id, client_order_id, "
+            "symbol, execution_time, status, execution_type, side, order_type, "
+            "total_quantity, limit_price, filled_quantity, filled_price, "
+            "total_filled_qty, leaves_qty. "
+            "Currently supported for Webull HK accounts only."
+        ),
+        annotations={"readOnlyHint": True},
+    )
+    async def list_order_executions(
+        account_id: str,
+        client_order_id: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        pagination_key: Optional[str] = None,
+    ) -> str:
+        """List order execution records within a specified date range.
+
+        Args:
+            account_id: Account ID.
+            client_order_id: Filter by the 3rd party order ID (optional).
+            start_date: Start date in the format yyyy-MM-dd (optional).
+            end_date: End date in the format yyyy-MM-dd (optional).
+            pagination_key: Pagination cursor from a previous response for the
+                next page (optional; omit for the first page).
+        """
+        try:
+            account_id = normalize_account_id(account_id)
+        except ValueError as e:
+            return f"Validation error: {e}"
+        audit.log_tool_call("list_order_executions", {"account_id": account_id})
+
+        if client_order_id is not None:
+            try:
+                validate_client_order_id(client_order_id)
+            except Exception as e:
+                return f"Validation error: {e}"
+
+        try:
+            kwargs: dict = {}
+            if client_order_id:
+                kwargs["client_order_id"] = client_order_id
+            if start_date:
+                kwargs["start_date"] = start_date
+            if end_date:
+                kwargs["end_date"] = end_date
+            if pagination_key:
+                kwargs["pagination_key"] = pagination_key
+            response = sdk.trade.order_v3.list_order_executions(
+                account_id=account_id, **kwargs
+            )
+            data = extract_response_data(response)
+            return prepend_disclaimer(format_order_executions(data))
+        except Exception as e:
+            return handle_sdk_exception(e, "list_order_executions")

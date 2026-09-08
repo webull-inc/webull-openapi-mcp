@@ -27,10 +27,10 @@ class TestUATEndpoints:
         assert UAT_ENDPOINTS["default_region"] == "us"
 
     def test_regions_list(self):
-        assert set(UAT_ENDPOINTS["regions"]) == {"us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br"}
+        assert set(UAT_ENDPOINTS["regions"]) == {"us", "hk", "jp", "sg", "my", "uk", "mx", "br", "za"}
 
     def test_each_region_has_all_api_types(self):
-        for region in ("us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br"):
+        for region in ("us", "hk", "jp", "sg", "my", "uk", "mx", "br", "za"):
             mapping = UAT_ENDPOINTS["region_mapping"][region]
             assert "api" in mapping
             assert "quotes-api" in mapping

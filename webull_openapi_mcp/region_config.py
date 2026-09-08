@@ -1,6 +1,6 @@
 """Region-specific configuration for Webull MCP Server.
 
-Defines region configurations for US, HK, JP, SG, TH, MY, UK, MX, BR, EU, ZA, and AU markets with:
+Defines region configurations for US, HK, JP, SG, MY, UK, MX, BR, and ZA markets with:
 - Feature flags (futures, crypto, event contracts, etc.)
 - Valid enum sets for order types, time-in-force, trading sessions, etc.
 
@@ -191,35 +191,6 @@ SG_REGION_CONFIG = RegionConfig(
     supports_fundamentals=True,
     asset_type_account_classes={
         "stock": frozenset({"INDIVIDUAL_CASH", "INDIVIDUAL_MRGN", "INDIVIDUAL_US_MARGIN"}),
-    },
-)
-
-
-# =============================================================================
-# TH Region Configuration
-# =============================================================================
-TH_REGION_CONFIG = RegionConfig(
-    region_id="th",
-    supports_futures=False,
-    supports_crypto=False,
-    supports_event_contracts=False,
-    supports_combo_orders=False,
-    supports_option_strategies=False,
-    supports_algo_orders=False,
-    valid_order_types=frozenset({
-        "MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"
-    }),
-    valid_time_in_force=frozenset({"DAY", "GTC"}),
-    valid_trading_sessions=frozenset({"NIGHT", "ALL", "CORE", "ALL_DAY"}),
-    valid_combo_types=frozenset({"NORMAL"}),
-    valid_option_strategies=frozenset({"SINGLE"}),
-    valid_market_categories=frozenset({"US"}),
-    valid_order_markets=frozenset({"US"}),
-    valid_instrument_categories=frozenset({"US_STOCK", "US_ETF"}),
-    supports_options=False,
-    supports_fundamentals=True,
-    asset_type_account_classes={
-        "stock": frozenset({"INDIVIDUAL_CASH"}),
     },
 )
 
@@ -435,14 +406,15 @@ REGION_CONFIGS: dict[str, RegionConfig] = {
     "hk": HK_REGION_CONFIG,
     "jp": JP_REGION_CONFIG,
     "sg": SG_REGION_CONFIG,
-    "th": TH_REGION_CONFIG,
     "my": MY_REGION_CONFIG,
     "uk": UK_REGION_CONFIG,
     "mx": MX_REGION_CONFIG,
     "br": BR_REGION_CONFIG,
-    "eu": EU_REGION_CONFIG,
     "za": ZA_REGION_CONFIG,
-    "au": AU_REGION_CONFIG,
+    # Note: TH, EU, and AU are not supported yet due to compliance
+    # requirements and are intentionally not registered, so selecting these
+    # regions raises UnsupportedRegionError. Their RegionConfig objects are
+    # kept defined above for quick re-enablement once compliance clears.
 }
 
 SUPPORTED_REGIONS: frozenset[str] = frozenset(REGION_CONFIGS.keys())
