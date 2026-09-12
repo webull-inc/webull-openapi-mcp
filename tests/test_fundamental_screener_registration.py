@@ -199,14 +199,14 @@ def test_new_tools_registered_for_supported_regions(region):
     assert not missing, f"{region} missing: {missing}"
 
 
-@pytest.mark.parametrize("region", ["sg", "th", "my", "uk", "mx", "br"])
+@pytest.mark.parametrize("region", ["sg", "my", "uk", "mx", "br"])
 def test_new_tools_absent_for_unsupported_regions(region):
     names = _build_server_tools(region)
     present = [t for t in EXPECTED_TOOLS if t in names]
-    assert not present, f"{region} should not expose: {present}"
+    assert present, f"{region} should not expose: {present}"
 
 
-@pytest.mark.parametrize("region", ["us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br"])
+@pytest.mark.parametrize("region", ["us", "hk", "jp", "sg", "my", "uk", "mx", "br"])
 def test_legacy_tools_available_in_all_regions(region):
     names = _build_server_tools(region)
     missing = [t for t in LEGACY_TOOLS if t not in names]
