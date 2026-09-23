@@ -10,7 +10,11 @@ from webull_openapi_mcp.errors import (
     RegionValidationError,
     ValidationError,
 )
-from webull_openapi_mcp.guards import OrderValidator
+from webull_openapi_mcp.guards import (
+    OrderValidator,
+    normalize_iso_utc_millis,
+    validate_option_order,
+)
 from webull_openapi_mcp.region_config import US_REGION_CONFIG, HK_REGION_CONFIG, JP_REGION_CONFIG
 
 
@@ -337,6 +341,95 @@ class TestOptionOrderValidation:
             _us_validator().validate_option_order(_valid_option_params(order_type="FOO"))
         assert exc_info.value.field == "order_type"
 
+    def test_jp_requires_position_intent(self):
+        # JP bug scenario: account_tax_type supplied but position_intent omitted.
+        with pytest.raises(ValidationError) as exc_info:
+            _jp_validator().validate_option_order(
+                _valid_option_params(account_tax_type="GENERAL")
+            )
+        assert exc_info.value.field == "position_intent"
+
+    def test_jp_allows_option_order_with_position_intent(self):
+        _jp_validator().validate_option_order(
+            _valid_option_params(account_tax_type="GENERAL", position_intent="BUY_TO_OPEN")
+        )
+
+    def test_jp_requires_account_tax_type_on_option(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _jp_validator().validate_option_order(
+                _valid_option_params(position_intent="BUY_TO_OPEN")
+            )
+        assert exc_info.value.field == "account_tax_type"
+
+    # -- API-1955: quantity must be a genuine int (strict reject bool/float) --
+    #
+    # Both preview_option_order and place_option_single_order route single-leg
+    # orders through the module-level validate_option_order(params, config),
+    # so these cases cover both tools at the validation layer.
+
+    @pytest.mark.parametrize("bad_quantity", [True, False, 1.0, 2.0])
+    def test_module_level_rejects_bool_and_float_quantity(self, bad_quantity):
+        config = _config(region_id="us")
+        with pytest.raises(ValidationError) as exc_info:
+            validate_option_order(_valid_option_params(quantity=bad_quantity), config)
+        assert exc_info.value.field == "quantity"
+
+    @pytest.mark.parametrize("bad_quantity", [True, False, 1.0, 2.0])
+    def test_rejects_bool_and_float_quantity(self, bad_quantity):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator().validate_option_order(_valid_option_params(quantity=bad_quantity))
+        assert exc_info.value.field == "quantity"
+
+    def test_genuine_int_quantity_passes(self):
+        config = _config(region_id="us")
+        validate_option_order(_valid_option_params(quantity=1), config)
+        _us_validator().validate_option_order(_valid_option_params(quantity=1))
+
+    @pytest.mark.parametrize("bad_quantity", [1.5, "abc"])
+    def test_non_integer_quantity_still_rejected(self, bad_quantity):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator().validate_option_order(_valid_option_params(quantity=bad_quantity))
+        assert exc_info.value.field == "quantity"
+
+    # -- API-1954: option quantity must honor WEBULL_MAX_ORDER_QUANTITY --
+    def test_option_quantity_above_max_rejected(self):
+        validator = _us_validator(max_order_quantity=5.0)
+        with pytest.raises(ValidationError) as exc_info:
+            validator.validate_option_order(_valid_option_params(quantity=6))
+        assert exc_info.value.field == "quantity"
+        # Finding A: the rejected raw quantity must not be echoed in the message.
+        assert "6" not in exc_info.value.message
+
+    def test_option_quantity_at_max_passes(self):
+        validator = _us_validator(max_order_quantity=5.0)
+        validator.validate_option_order(_valid_option_params(quantity=5))
+
+
+class TestValidationMessagesHideRawValues:
+    """Finding A: validation messages must not echo client-supplied raw values."""
+
+    def test_invalid_side_message_hides_value(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator().validate_stock_order(_valid_stock_params(side="SNEAKY"))
+        assert "SNEAKY" not in exc_info.value.message
+
+    def test_invalid_option_order_type_message_hides_value(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator().validate_option_order(_valid_option_params(order_type="SNEAKY"))
+        assert "SNEAKY" not in exc_info.value.message
+
+    def test_quantity_too_low_message_hides_value(self):
+        with pytest.raises(ValidationError) as exc_info:
+            _us_validator().validate_stock_order(_valid_stock_params(quantity=-7))
+        assert "-7" not in exc_info.value.message
+
+    def test_region_validation_error_hides_value(self):
+        with pytest.raises(RegionValidationError) as exc_info:
+            _us_validator().validate_stock_order(
+                _valid_stock_params(order_type="SNEAKY")
+            )
+        assert "SNEAKY" not in exc_info.value.message
+
 
 class TestOptionTifValidation:
     @pytest.mark.parametrize("tif", ["DAY", "GTC"])
@@ -606,3 +699,23 @@ class TestJPValidation:
                 close_contracts=[{"contract_id": "C1", "quantity": "0"}],
             ))
         assert exc_info.value.field == "close_contracts"
+
+
+# ---------------------------------------------------------------------------
+# ISO UTC millisecond normalization (API-1958)
+# ---------------------------------------------------------------------------
+
+class TestNormalizeIsoUtcMillis:
+    def test_second_precision_is_upgraded_to_milliseconds(self):
+        assert normalize_iso_utc_millis("2026-10-01T00:00:00Z") == "2026-10-01T00:00:00.000Z"
+
+    def test_millisecond_precision_passes_through_unchanged(self):
+        assert normalize_iso_utc_millis("2026-10-01T00:00:00.000Z") == "2026-10-01T00:00:00.000Z"
+
+    def test_existing_milliseconds_are_not_double_appended(self):
+        value = "2026-10-01T12:34:56.123Z"
+        assert normalize_iso_utc_millis(value) == value
+        assert normalize_iso_utc_millis(value).count(".") == 1
+
+    def test_none_passes_through(self):
+        assert normalize_iso_utc_millis(None) is None

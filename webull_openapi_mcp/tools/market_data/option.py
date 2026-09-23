@@ -7,7 +7,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from webull_openapi_mcp.errors import handle_sdk_exception
+from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
+from webull_openapi_mcp.guards import (
+    validate_enum,
+    validate_positive_whole_number,
+    validate_symbol_list,
+)
 from webull_openapi_mcp.formatters import (
     extract_response_data,
     prepend_disclaimer,
@@ -107,7 +112,7 @@ def _format_option_bars(data) -> str:
         symbol = item.get("symbol", "N/A")
         bars = item.get("result", [])
         lines.append(f"  Symbol: {symbol} ({len(bars)} bars)")
-        for bar in bars[:30]:
+        for bar in bars:
             lines.append(
                 f"    Time: {bar.get('time', 'N/A')}  "
                 f"O: {bar.get('open', 'N/A')}  "
@@ -125,7 +130,7 @@ def register_option_market_data_tools(
     audit: AuditLogger,
     config: ServerConfig,
 ) -> None:
-    """Register option market data tools (US, HK, JP regions)."""
+    """Register HTTP option market data tools for US-listed contracts."""
 
     @mcp.tool(
         description=(
@@ -145,6 +150,12 @@ def register_option_market_data_tools(
     ) -> str:
         """Get option tick-by-tick trade data."""
         audit.log_tool_call("get_option_tick", {"symbol": symbol})
+        try:
+            validate_enum(category, frozenset({"US_OPTION"}), "category")
+            validate_symbol_list(symbol, field="symbol", maximum=1)
+            validate_positive_whole_number(count, "count", maximum=1200)
+        except ValidationError as e:
+            return f"Validation error: {e.message}"
         try:
             data = extract_response_data(
                 sdk.data.option_market_data.get_option_tick(
@@ -172,7 +183,11 @@ def register_option_market_data_tools(
         """Get real-time option snapshot for one or more option symbols."""
         audit.log_tool_call("get_option_snapshot", {"symbols": symbols})
         try:
-            sym_list = [s.strip() for s in symbols.split(",") if s.strip()]
+            validate_enum(category, frozenset({"US_OPTION"}), "category")
+            sym_list = validate_symbol_list(symbols)
+        except ValidationError as e:
+            return f"Validation error: {e.message}"
+        try:
             data = extract_response_data(
                 sdk.data.option_market_data.get_option_snapshot(
                     symbols=sym_list, category=category,
@@ -204,7 +219,17 @@ def register_option_market_data_tools(
         """Get option historical OHLCV bar data."""
         audit.log_tool_call("get_option_bars", {"symbols": symbols, "timespan": timespan})
         try:
-            sym_list = [s.strip() for s in symbols.split(",") if s.strip()]
+            validate_enum(category, frozenset({"US_OPTION"}), "category")
+            validate_enum(
+                timespan,
+                frozenset({"M1", "M5", "M15", "M30", "M60", "M120", "M240", "D", "W", "M", "Y"}),
+                "timespan",
+            )
+            validate_positive_whole_number(count, "count", maximum=1200)
+            sym_list = validate_symbol_list(symbols)
+        except ValidationError as e:
+            return f"Validation error: {e.message}"
+        try:
             kwargs: dict = {
                 "symbols": sym_list,
                 "category": category,

@@ -3,7 +3,9 @@
 Provides:
 - register_screener_tools: gainers/losers, most active (all regions).
 - register_extended_screener_tools: market sectors, market sector detail,
-  high dividend, 52-week high/low. All regions.
+  high dividend, 52-week high/low for US / HK / JP. When the region is US it
+  also registers US-only insight tools: fear & greed sentiment index and
+  unusual activity alerts.
 """
 
 from __future__ import annotations
@@ -18,7 +20,9 @@ from webull_openapi_mcp.formatters import (
     format_high_dividend,
     format_market_sectors,
     format_market_sectors_detail,
+    format_market_sentiment,
     format_most_active,
+    format_stock_unusual_activities,
     prepend_disclaimer,
 )
 
@@ -136,6 +140,9 @@ def register_extended_screener_tools(
 
     Covers market sectors, market sector detail, high dividend, and 52-week
     high/low rankings.
+
+    When the region is US, this also registers US-only insight tools: the fear
+    & greed sentiment index and unusual activity alerts.
     """
 
     @mcp.tool(
@@ -313,3 +320,66 @@ def register_extended_screener_tools(
             return prepend_disclaimer(format_fifty_two_week(data))
         except Exception as e:
             return handle_sdk_exception(e, "get_52_week_high_low", config.region_id)
+
+    # ------------------------------------------------------------------
+    # US market insight screeners (fear & greed sentiment index,
+    # unusual activity alerts) — US market only.
+    # ------------------------------------------------------------------
+    if config.region_id == "us":
+        @mcp.tool(
+            description=(
+                "Get the US market fear and greed sentiment index and historical "
+                "comparison points (previous day, one week ago, one month ago). "
+                "Returns: current, previous_day, one_week_ago, one_month_ago, time_zone."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_market_sentiment() -> str:
+            """Get the US market fear and greed sentiment index."""
+            audit.log_tool_call("get_market_sentiment", {})
+            try:
+                data = extract_response_data(
+                    sdk.data.screener.get_fear_and_greed_index(category="US_STOCK")
+                )
+                return prepend_disclaimer(format_market_sentiment(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_market_sentiment", config.region_id)
+
+        @mcp.tool(
+            description=(
+                "Get recent unusual activity alerts for a US stock, including volume "
+                "surge and price spike events (up to 30 most recent events within the "
+                "last 90 calendar days). "
+                "Returns: alert events with symbol, time, alert contents."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_stock_unusual_activities(
+            symbol: Optional[str] = None,
+            count: int = 10,
+            alert_types: Optional[str] = None,
+            extended_hours_required: bool = False,
+        ) -> str:
+            """Get recent unusual activity alerts for a US stock.
+
+            Args:
+                symbol: Stock symbol (e.g. NVDA). All symbols if omitted.
+                count: Number of most recent events (default 10, max 30).
+                alert_types: Comma-separated alert type filter. Default returns all.
+                extended_hours_required: Whether to include pre-market and
+                    after-hours alerts.
+            """
+            audit.log_tool_call("get_stock_unusual_activities", {"symbol": symbol} if symbol else {})
+            try:
+                data = extract_response_data(
+                    sdk.data.screener.get_stock_unusual_activities(
+                        symbol=symbol or None,
+                        category="US_STOCK",
+                        count=count,
+                        alert_types=alert_types or None,
+                        extended_hours_required=extended_hours_required or None,
+                    )
+                )
+                return prepend_disclaimer(format_stock_unusual_activities(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_stock_unusual_activities", config.region_id)

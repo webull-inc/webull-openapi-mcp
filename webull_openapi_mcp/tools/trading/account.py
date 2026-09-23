@@ -22,16 +22,19 @@ if TYPE_CHECKING:
 
 
 def normalize_account_id(account_id: str | None) -> str | None:
-    """Normalize opaque account IDs to strings for SDK calls.
+    """Normalize and validate opaque account IDs for SDK calls.
 
-    Accepts only ``str`` (or ``None``).  The MCP tool schema exposes
-    ``account_id`` as a pure string so that large numeric IDs are never
-    silently truncated by JSON integer precision limits.
+    Accepts only non-empty strings so large numeric IDs are never silently
+    truncated by JSON integer precision limits.
     """
     if account_id is None:
         return None
     if not isinstance(account_id, str):
         raise ValueError("account_id must be a string")
+    if not account_id:
+        raise ValueError("account_id must not be empty")
+    if len(account_id) > 128:
+        raise ValueError("account_id exceeds max length of 128 characters")
     return account_id
 
 

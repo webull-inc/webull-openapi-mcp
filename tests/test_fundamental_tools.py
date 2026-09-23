@@ -9,6 +9,7 @@ from webull_openapi_mcp.formatters import (
     format_capital_flow,
     format_cash_flow,
     format_dividend_calendar,
+    format_economic_calendar,
     format_earnings_calendar,
     format_financial_alert,
     format_financial_indicators,
@@ -24,6 +25,11 @@ from webull_openapi_mcp.formatters import (
     format_fund_splits,
     format_income_statement,
     format_industry_comparison,
+    format_institution_holding_changes,
+    format_institution_holdings,
+    format_institution_search,
+    format_insider_holdings_overview,
+    format_insider_transactions,
     format_sec_filings,
 )
 
@@ -56,6 +62,12 @@ _NO_DATA = "No data available."
     format_income_statement,
     format_balance_sheet,
     format_cash_flow,
+    format_institution_search,
+    format_institution_holdings,
+    format_institution_holding_changes,
+    format_insider_transactions,
+    format_insider_holdings_overview,
+    format_economic_calendar,
 ])
 def test_returns_no_data_for_none(fn):
     assert fn(None) == _NO_DATA
@@ -532,3 +544,76 @@ class TestFormatCashFlow:
         assert "800" in result
         assert "Capital Expenditure" in result
         assert "-250" in result
+
+
+class TestFormatInstitutionSearch:
+    def test_formats_list_with_pagination(self):
+        data = {
+            "keyword": "berkshire",
+            "pagination_key": "Ne8Ld4XUwpFFRMWyI2Z1",
+            "data": [
+                {"cik": "0001067983", "name": "Berkshire Hathaway Inc",
+                 "notable_people": "Warren Buffett"},
+            ],
+        }
+        result = format_institution_search(data)
+        assert "=== Institution Search ===" in result
+        assert "[1]" in result
+        assert "Berkshire Hathaway Inc" in result
+        assert "Warren Buffett" in result
+        assert "Next pagination_key: Ne8Ld4XUwpFFRMWyI2Z1" in result
+
+
+class TestFormatInstitutionHoldings:
+    def test_formats_list_with_pagination(self):
+        data = {"data": [{"stock": "AAPL", "quantity": "49665910"}]}
+        result = format_institution_holdings(data)
+        assert "=== Institution 13F Holdings ===" in result
+        assert "AAPL" in result
+
+
+class TestFormatInstitutionHoldingChanges:
+    def test_formats_list_with_pagination(self):
+        data = {
+            "next_pagination_key": "b25664000b8a04fb4fee",
+            "data": [{"stock": "AAPL", "position": "OPEN"}],
+        }
+        result = format_institution_holding_changes(data)
+        assert "=== Institution Holding Changes ===" in result
+        assert "Next pagination_key: b25664000b8a04fb4fee" in result
+
+
+class TestFormatInsiderTransactions:
+    def test_formats_list_with_pagination(self):
+        data = {
+            "data": [
+                {"side": "BUY", "shares": "13866", "price": "0",
+                 "insider_name": "Gawel Scott", "transaction_date": "2026-06-08"},
+            ],
+        }
+        result = format_insider_transactions(data)
+        assert "=== Insider Transactions ===" in result
+        assert "Gawel Scott" in result
+        assert "2026-06-08" in result
+
+
+class TestFormatInsiderHoldingsOverview:
+    def test_formats_overview(self):
+        data = {"symbol": "NVDA", "insiders_count": 20, "ownership_pct": "3.9665"}
+        result = format_insider_holdings_overview(data)
+        assert "=== Insider Holdings Overview ===" in result
+        assert "3.9665" in result
+
+
+class TestFormatEconomicCalendar:
+    def test_formats_list_with_pagination(self):
+        data = {
+            "pkey": "iPxeAijSJUKDUMAAAiAAAA",
+            "data": [
+                {"event_name": "Net L-T Flows,Incl.Swaps", "publish_date": "2026-10-16",
+                 "is_fed_related": False},
+            ],
+        }
+        result = format_economic_calendar(data)
+        assert "=== US Economic Calendar ===" in result
+        assert "2026-10-16" in result

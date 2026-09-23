@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from webull_openapi_mcp.errors import handle_sdk_exception
+from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
 from webull_openapi_mcp.formatters import (
     extract_response_data,
     format_open_orders,
@@ -20,7 +20,12 @@ from webull_openapi_mcp.formatters import (
     format_order_history,
     prepend_disclaimer,
 )
-from webull_openapi_mcp.guards import validate_client_order_id
+from webull_openapi_mcp.guards import (
+    normalize_iso_utc_millis,
+    validate_client_order_id,
+    validate_iso_utc_range,
+    validate_pagination_key,
+)
 from webull_openapi_mcp.tools.trading.account import normalize_account_id
 
 if TYPE_CHECKING:
@@ -90,58 +95,63 @@ def register_order_tools(
 
     @mcp.tool(
         description=(
-            "Get historical orders, default last 7 days. "
-            "Returns: client_order_id, symbol, side, order_type, quantity, "
-            "filled_quantity, price, avg_filled_price, status, "
-            "time_in_force, create_time."
+            "Get historical orders with option legs and multi-order groups preserved. "
+            "start_time/end_time: ISO 8601 UTC timestamps ending in Z. "
+            "pagination_key: Opaque cursor returned by the previous response."
         ),
         annotations={"readOnlyHint": True},
     )
     async def get_order_history(
         account_id: str,
-        start: Optional[str] = None,
-        end: Optional[str] = None,
-        limit: Optional[int] = 10,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        pagination_key: Optional[str] = None,
     ) -> str:
-        """Get historical orders, default last 7 days."""
+        """Get historical orders using the current cursor protocol."""
         try:
             account_id = normalize_account_id(account_id)
-        except ValueError as e:
-            return f"Validation error: {e}"
+            validate_iso_utc_range(start_time, end_time)
+            validate_pagination_key(pagination_key)
+        except (ValueError, ValidationError) as e:
+            message = e.message if isinstance(e, ValidationError) else str(e)
+            return f"Validation error: {message}"
         audit.log_tool_call("get_order_history", {"account_id": account_id})
         try:
             kwargs: dict = {}
-            if start:
-                kwargs["start_date"] = start
-            if end:
-                kwargs["end_date"] = end
-            if limit:
-                kwargs["page_size"] = limit
-            response = sdk.trade.order_v3.get_order_history(account_id=account_id, **kwargs)
+            if start_time is not None:
+                kwargs["start_time"] = normalize_iso_utc_millis(start_time)
+            if end_time is not None:
+                kwargs["end_time"] = normalize_iso_utc_millis(end_time)
+            if pagination_key is not None:
+                kwargs["pagination_key"] = pagination_key
+            response = sdk.trade.order_v3.list_order_history(account_id=account_id, **kwargs)
             data = extract_response_data(response)
             return prepend_disclaimer(format_order_history(data))
         except Exception as e:
             return handle_sdk_exception(e, "get_order_history")
 
     @mcp.tool(
-        description="Get all current open/pending orders. Returns same fields as get_order_history.",
+        description=(
+            "Get current open/pending orders with option legs and multi-order groups preserved. "
+            "pagination_key: Opaque cursor returned by the previous response."
+        ),
         annotations={"readOnlyHint": True},
     )
     async def get_open_orders(
         account_id: str,
-        limit: Optional[int] = 10,
+        pagination_key: Optional[str] = None,
     ) -> str:
-        """Get all current open orders."""
+        """Get open orders using the current cursor protocol."""
         try:
             account_id = normalize_account_id(account_id)
-        except ValueError as e:
-            return f"Validation error: {e}"
+            validate_pagination_key(pagination_key)
+        except (ValueError, ValidationError) as e:
+            message = e.message if isinstance(e, ValidationError) else str(e)
+            return f"Validation error: {message}"
         audit.log_tool_call("get_open_orders", {"account_id": account_id})
         try:
-            kwargs: dict = {}
-            if limit:
-                kwargs["page_size"] = limit
-            response = sdk.trade.order_v3.get_order_open(account_id=account_id, **kwargs)
+            kwargs = {"pagination_key": pagination_key} if pagination_key is not None else {}
+            response = sdk.trade.order_v3.list_order_open(account_id=account_id, **kwargs)
             data = extract_response_data(response)
             return prepend_disclaimer(format_open_orders(data))
         except Exception as e:
@@ -163,9 +173,14 @@ def register_order_tools(
         """Get single order details."""
         try:
             account_id = normalize_account_id(account_id)
-        except ValueError as e:
-            return f"Validation error: {e}"
-        audit.log_tool_call("get_order_detail", {"account_id": account_id, "client_order_id": client_order_id})
+            validate_client_order_id(client_order_id)
+        except (ValueError, ValidationError) as e:
+            message = e.message if isinstance(e, ValidationError) else str(e)
+            return f"Validation error: {message}"
+        audit.log_tool_call(
+            "get_order_detail",
+            {"account_id": account_id, "client_order_id": client_order_id},
+        )
         try:
             response = sdk.trade.order_v3.get_order_detail(
                 account_id=account_id, client_order_id=client_order_id

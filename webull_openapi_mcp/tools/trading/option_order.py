@@ -18,7 +18,13 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
 from webull_openapi_mcp.formatters import prepend_disclaimer, extract_response_data, format_order_preview, format_decimal
-from webull_openapi_mcp.guards import validate_client_order_id, validate_option_order, validate_option_strategy_order
+from webull_openapi_mcp.guards import (
+    validate_client_order_id,
+    validate_option_order,
+    validate_option_strategy_order,
+    validate_positive_decimal,
+    validate_positive_whole_number,
+)
 from webull_openapi_mcp.region_config import get_region_config
 from webull_openapi_mcp.tools.trading.account import (
     normalize_account_id,
@@ -81,6 +87,7 @@ def _build_option_order(
     limit_price: float | None,
     stop_price: float | None,
     position_intent: str | None = None,
+    account_tax_type: str | None = None,
     leg_in_or_out: str | None = None,
     position_id: str | None = None,
     leg_in_strategy: str | None = None,
@@ -89,6 +96,9 @@ def _build_option_order(
     order: dict = {
         "client_order_id": coid,
         "combo_type": "NORMAL",
+        "instrument_type": "OPTION",
+        "market": "US",
+        "symbol": symbol,
         "order_type": order_type,
         "quantity": format_decimal(quantity),
         "option_strategy": "SINGLE",
@@ -112,6 +122,8 @@ def _build_option_order(
     _add_optional_str(order, "stop_price", stop_price)
     if position_intent is not None:
         order["position_intent"] = position_intent
+    if account_tax_type is not None:
+        order["account_tax_type"] = account_tax_type
     # Option leg-in / leg-out fields (US only)
     if leg_in_or_out is not None:
         order["leg_in_or_out"] = leg_in_or_out
@@ -246,7 +258,7 @@ def register_option_single_tools(
             "Call get_account_list first.\n"
             "order_type: MARKET, LIMIT, STOP_LOSS, STOP_LOSS_LIMIT.\n"
             "time_in_force: DAY, GTC. trading_session: CORE only.\n"
-            "position_intent: BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, SELL_TO_CLOSE (optional, US only).\n"
+            "position_intent: BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, SELL_TO_CLOSE (optional).\n"
             "Leg-in / leg-out (US only, single-leg option): "
             "leg_in_or_out=LEG_IN adds this leg to an existing position; LEG_OUT closes a leg from a multi-leg position. "
             "position_id (from Account Positions API) is required when leg_in_or_out is set. "
@@ -268,6 +280,7 @@ def register_option_single_tools(
         limit_price: Optional[float] = None,
         stop_price: Optional[float] = None,
         position_intent: Optional[str] = None,
+        account_tax_type: Optional[str] = None,
         leg_in_or_out: Optional[str] = None,
         position_id: Optional[str] = None,
         leg_in_strategy: Optional[str] = None,
@@ -282,7 +295,18 @@ def register_option_single_tools(
         except ValueError as e:
             return f"Account error: {e}"
 
-        params: dict = {"side": side, "order_type": order_type, "time_in_force": time_in_force}
+        params: dict = {
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "option_type": option_type,
+            "strike_price": strike_price,
+            "expiration_date": expiration_date,
+            "order_type": order_type,
+            "time_in_force": time_in_force,
+            "position_intent": position_intent,
+            "account_tax_type": account_tax_type,
+        }
         if limit_price is not None:
             params["limit_price"] = limit_price
         if stop_price is not None:
@@ -335,6 +359,7 @@ def register_option_single_tools(
             time_in_force=time_in_force,
             limit_price=limit_price, stop_price=stop_price,
             position_intent=position_intent,
+            account_tax_type=account_tax_type,
             leg_in_or_out=leg_in_or_out,
             position_id=position_id,
             leg_in_strategy=leg_in_strategy,
@@ -363,7 +388,11 @@ def register_option_single_tools(
             return handle_sdk_exception(e, "place_option_single_order")
 
     @mcp.tool(
-        description="Preview an option order without submitting. Returns: estimated cost and fees.",
+        description=(
+            "Preview an option order without submitting. Returns: estimated cost and fees.\n"
+            "position_intent: BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, SELL_TO_CLOSE "
+            "(required by some regions, e.g. JP)."
+        ),
     )
     async def preview_option_order(
         account_id: str,
@@ -377,6 +406,8 @@ def register_option_single_tools(
         time_in_force: str,
         limit_price: Optional[float] = None,
         stop_price: Optional[float] = None,
+        position_intent: Optional[str] = None,
+        account_tax_type: Optional[str] = None,
     ) -> str:
         """Preview option order without submitting."""
         try:
@@ -385,6 +416,25 @@ def register_option_single_tools(
             return f"Validation error: {e}"
         audit.log_tool_call("preview_option_order", {"symbol": symbol, "side": side})
 
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "option_type": option_type,
+            "strike_price": strike_price,
+            "expiration_date": expiration_date,
+            "order_type": order_type,
+            "time_in_force": time_in_force,
+            "limit_price": limit_price,
+            "stop_price": stop_price,
+            "position_intent": position_intent,
+            "account_tax_type": account_tax_type,
+        }
+        try:
+            validate_option_order(params, config)
+        except ValidationError as e:
+            return f"Validation error: {e.message}"
+
         preview_order = _build_option_order(
             coid=_generate_client_order_id(),
             symbol=symbol, side=side, quantity=quantity,
@@ -392,6 +442,8 @@ def register_option_single_tools(
             expiration_date=expiration_date, order_type=order_type,
             time_in_force=time_in_force,
             limit_price=limit_price, stop_price=stop_price,
+            position_intent=position_intent,
+            account_tax_type=account_tax_type,
         )
 
         try:
@@ -427,6 +479,14 @@ def register_option_single_tools(
 
         try:
             validate_client_order_id(client_order_id)
+            if limit_price is not None:
+                validate_positive_decimal(limit_price, "limit_price")
+            if stop_price is not None:
+                validate_positive_decimal(stop_price, "stop_price")
+            if quantity is not None:
+                validate_positive_whole_number(quantity, "quantity")
+            if time_in_force is not None and time_in_force not in {"DAY", "GTC"}:
+                raise ValidationError("time_in_force must be DAY or GTC", field="time_in_force")
         except ValidationError as e:
             return f"Validation error: {e.message}"
 

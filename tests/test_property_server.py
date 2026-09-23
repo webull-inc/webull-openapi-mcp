@@ -242,7 +242,7 @@ def test_property17_logger_handlers_target_stderr():
 
 
 def test_jp_region_registers_expected_tool_subset():
-    """JP exposes stock/account tools plus JP position details, but no US-only option/futures tools."""
+    """JP exposes stock/account/US-listed-option tools, but no futures/crypto/event tools."""
     pytest.importorskip("fastmcp")
     from webull_openapi_mcp.server import build_server
 
@@ -253,13 +253,52 @@ def test_jp_region_registers_expected_tool_subset():
     assert "get_account_position_details" in names
     assert "place_stock_order" in names
     assert "get_instruments" in names
+    assert "get_option_contracts" in names
+    assert "place_option_single_order" in names
     assert "get_futures_instruments" not in names
     assert "get_crypto_instruments" not in names
     assert "get_event_series" not in names
-    assert "place_option_single_order" not in names
     assert "place_futures_order" not in names
     assert "place_crypto_order" not in names
     assert "place_event_order" not in names
+
+
+def test_th_region_registers_single_leg_option_tools():
+    """TH exposes single-leg option query + trade tools, but no multi-leg/strategy or other-asset tools."""
+    pytest.importorskip("fastmcp")
+    from webull_openapi_mcp.server import build_server
+
+    server = build_server(_config(region_id="th"))
+    tools = asyncio.get_event_loop().run_until_complete(server.list_tools())
+    names = {tool.name for tool in tools}
+
+    # Single-leg option query + trade tools are available.
+    assert "get_option_contracts" in names
+    assert "get_option_snapshot" in names
+    assert "place_option_single_order" in names
+    assert "preview_option_order" in names
+    # Multi-leg (option-strategy) stays disabled for TH.
+    assert "place_option_strategy" not in names
+    # Other asset classes stay disabled for TH.
+    assert "get_futures_instruments" not in names
+    assert "get_crypto_instruments" not in names
+    assert "get_event_series" not in names
+
+
+def test_th_registered_and_eu_deferred():
+    """TH is a supported region with single-leg options; EU remains unregistered (deferred)."""
+    from webull_openapi_mcp.region_config import SUPPORTED_REGIONS, get_region_config
+    from webull_openapi_mcp.errors import UnsupportedRegionError
+
+    assert "th" in SUPPORTED_REGIONS
+    th = get_region_config("th")
+    assert th.supports_options is True
+    assert th.supports_option_strategies is False
+    assert th.asset_type_account_classes.get("option") == frozenset({"INDIVIDUAL_CASH"})
+
+    assert "eu" not in SUPPORTED_REGIONS
+    with pytest.raises(UnsupportedRegionError):
+        get_region_config("eu")
 
 
 def _schema_types(schema: dict) -> set[str]:
@@ -413,3 +452,147 @@ def test_place_stock_order_schema_uses_string_account_id():
 
     assert "string" in types
     assert "integer" not in types
+
+
+# ---------------------------------------------------------------------------
+# API-1956: get_option_contracts date-range semantics and ordering validation
+# ---------------------------------------------------------------------------
+
+def _build_option_contracts_tool():
+    """Register instrument tools on an options-capable region and return the tool."""
+    fastmcp = pytest.importorskip("fastmcp")
+    FastMCP = fastmcp.FastMCP
+
+    sdk = MagicMock()
+    sdk.data.instrument.list_option_contracts.return_value = {"data": [], "pagination_key": None}
+    config = _config(region_id="jp")
+    audit = AuditLogger(config)
+
+    mcp = FastMCP("test")
+    from webull_openapi_mcp.tools.trading.instrument import register_instrument_tools
+
+    register_instrument_tools(mcp, sdk, audit, config)
+    tool = asyncio.get_event_loop().run_until_complete(mcp.get_tool("get_option_contracts"))
+    return sdk, tool
+
+
+def test_option_contracts_allows_start_after_end():
+    """start_date and end_date are independent expiration filters, not a paired range.
+
+    Under the official API semantics start_date is an exact expiration date and
+    end_date is an inclusive lower bound, so there is no ordering constraint
+    between them and the SDK is still called.
+    """
+    sdk, tool = _build_option_contracts_tool()
+
+    result = asyncio.get_event_loop().run_until_complete(
+        tool.fn(
+            underlying_symbols="AAPL",
+            status="LISTING",
+            start_date="2026-12-18",
+            end_date="2026-01-01",
+        )
+    )
+
+    assert "Validation error" not in result
+    sdk.data.instrument.list_option_contracts.assert_called_once()
+
+
+def test_option_contracts_accepts_valid_dates():
+    """Valid ISO dates pass validation and are forwarded to the SDK unchanged."""
+    sdk, tool = _build_option_contracts_tool()
+
+    asyncio.get_event_loop().run_until_complete(
+        tool.fn(
+            underlying_symbols="AAPL",
+            status="LISTING",
+            start_date="2026-01-01",
+            end_date="2026-12-18",
+        )
+    )
+
+    sdk.data.instrument.list_option_contracts.assert_called_once()
+    kwargs = sdk.data.instrument.list_option_contracts.call_args.kwargs
+    assert kwargs["start_date"] == "2026-01-01"
+    assert kwargs["end_date"] == "2026-12-18"
+
+
+def test_option_contracts_description_states_official_semantics():
+    """Tool description must describe start_date as an exact date and end_date as a lower bound."""
+    _sdk, tool = _build_option_contracts_tool()
+
+    description = tool.description
+    assert "exact expiration date" in description
+    assert "lower bound" in description
+    assert "upper bound" not in description
+
+
+# ---------------------------------------------------------------------------
+# API-1957: get_option_contracts must not render fake rows for empty/invalid
+# backend responses.
+# ---------------------------------------------------------------------------
+
+_NO_OPTION_CONTRACTS = "No option contracts found."
+
+
+def test_format_option_contracts_empty_list_reports_no_contracts():
+    """A present-but-empty contracts list (non-existent symbol) must report no contracts."""
+    from webull_openapi_mcp.tools.trading.instrument import _format_option_contracts
+
+    result = _format_option_contracts({"data": [], "pagination_key": None})
+
+    assert result == _NO_OPTION_CONTRACTS
+    assert "results" not in result
+    assert "N/A" not in result
+
+
+def test_format_option_contracts_null_record_reports_no_contracts():
+    """An all-null record without instrument_id must not be shown as a contract."""
+    from webull_openapi_mcp.tools.trading.instrument import _format_option_contracts
+
+    data = {
+        "data": [
+            {
+                "symbol": None,
+                "instrument_id": None,
+                "underlying_symbol": None,
+                "option_type": None,
+            }
+        ],
+        "pagination_key": None,
+    }
+
+    result = _format_option_contracts(data)
+
+    assert result == _NO_OPTION_CONTRACTS
+    assert "results" not in result
+    assert "N/A" not in result
+
+
+def test_format_option_contracts_normal_response_still_renders():
+    """A normal non-empty response must still format exactly as before."""
+    from webull_openapi_mcp.tools.trading.instrument import _format_option_contracts
+
+    data = {
+        "data": [
+            {
+                "symbol": "AAPL240119C00150000",
+                "instrument_id": "913256135",
+                "underlying_symbol": "AAPL",
+                "option_type": "CALL",
+                "strike_price": "150",
+                "init_exp_date": "2024-01-19",
+                "style": "AMERICAN",
+                "status": "LISTING",
+                "tradable_status": "TRADABLE",
+            }
+        ],
+        "pagination_key": None,
+    }
+
+    result = _format_option_contracts(data)
+
+    assert "=== Option Contracts (1 results) ===" in result
+    assert "AAPL240119C00150000" in result
+    assert "913256135" in result
+    assert "CALL" in result

@@ -5,7 +5,9 @@ Provides:
 - register_extended_fundamental_tools: stock fundamentals (capital flow, SEC
   filings, earnings/dividend calendar, forecast EPS, industry comparison) and
   fund fundamentals (rating, performance, allocation, holdings, brief, dividends,
-  splits, net value, files). All regions.
+  splits, net value, files) for US / HK / JP. When the region is US it also
+  registers US-only insight tools: institution search, 13F holdings, holding
+  changes, insider transactions, insider holdings overview, economic calendar.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from webull_openapi_mcp.formatters import (
     format_company_profile,
     format_dividend_calendar,
     format_earnings_calendar,
+    format_economic_calendar,
     format_forecast_eps,
     format_fund_allocation,
     format_fund_brief,
@@ -32,6 +35,11 @@ from webull_openapi_mcp.formatters import (
     format_fund_rating,
     format_fund_splits,
     format_industry_comparison,
+    format_insider_holdings_overview,
+    format_insider_transactions,
+    format_institution_holding_changes,
+    format_institution_holdings,
+    format_institution_search,
     format_sec_filings,
     prepend_disclaimer,
 )
@@ -143,6 +151,10 @@ def register_extended_fundamental_tools(
 
     Covers capital flow, SEC filings, earnings/dividend calendars, forecast EPS,
     industry comparison, and the full fund data suite.
+
+    When the region is US, this also registers US-only insight tools:
+    institution search, 13F holdings, holding changes, insider transactions,
+    insider holdings overview, and the macroeconomic event calendar.
     """
 
     # ------------------------------------------------------------------
@@ -578,3 +590,201 @@ def register_extended_fundamental_tools(
             return prepend_disclaimer(format_fund_files(data))
         except Exception as e:
             return handle_sdk_exception(e, "get_fund_files", config.region_id)
+
+    # ------------------------------------------------------------------
+    # US market insight fundamentals (institutions, 13F, insider,
+    # macroeconomic calendar) — US market only.
+    # ------------------------------------------------------------------
+    if config.region_id == "us":
+        @mcp.tool(
+            description=(
+                "Search US institutional investors by name or SEC CIK number. "
+                "Returns: cik, name, notable_people."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_institution_identifier(
+            keyword: str,
+            pagination_key: Optional[str] = None,
+        ) -> str:
+            """Search US institutional investors.
+
+            Args:
+                keyword: Search keyword (institution name or CIK).
+                pagination_key: Pagination key from the previous page response;
+                    not returned on the last page.
+            """
+            audit.log_tool_call("get_institution_identifier", {"keyword": keyword})
+            try:
+                data = extract_response_data(
+                    sdk.data.fundamentals.get_institution_search(keyword, pagination_key)
+                )
+                return prepend_disclaimer(format_institution_search(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_institution_identifier", config.region_id)
+
+        @mcp.tool(
+            description=(
+                "Get a US institution's 13F holdings. "
+                "Returns: 13F holdings list."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_institution_holdings(
+            cik: str,
+            pagination_key: Optional[str] = None,
+        ) -> str:
+            """Get a US institution's 13F holdings.
+
+            Args:
+                cik: Institution CIK number.
+                pagination_key: Pagination key from the previous page response;
+                    not returned on the last page.
+            """
+            audit.log_tool_call("get_institution_holdings", {"cik": cik})
+            try:
+                data = extract_response_data(
+                    sdk.data.fundamentals.get_institution_holdings(cik, pagination_key)
+                )
+                return prepend_disclaimer(format_institution_holdings(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_institution_holdings", config.region_id)
+
+        @mcp.tool(
+            description=(
+                "Get US institutional holding changes filtered by position type. "
+                "Returns: holding change records."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_institution_holding_changes(
+            cik: str,
+            position: str,
+            pagination_key: Optional[str] = None,
+        ) -> str:
+            """Get US institutional holding changes.
+
+            Args:
+                cik: Fund CIK number.
+                position: Position type. Valid values: OPEN, CLOSE, CHANGE.
+                pagination_key: Pagination key from the previous page response;
+                    not returned on the last page.
+            """
+            audit.log_tool_call("get_institution_holding_changes", {"cik": cik, "position": position})
+            if position.upper() not in {"OPEN", "CLOSE", "CHANGE"}:
+                return "Validation error: position must be one of OPEN, CLOSE, CHANGE."
+            try:
+                data = extract_response_data(
+                    sdk.data.fundamentals.get_institution_holding_changes(
+                        cik, position.upper(), pagination_key=pagination_key,
+                    )
+                )
+                return prepend_disclaimer(format_institution_holding_changes(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_institution_holding_changes", config.region_id)
+
+        @mcp.tool(
+            description=(
+                "Get insider transaction records for a US stock with optional "
+                "BUY or SELL filtering. "
+                "Returns: insider transactions with side, shares, price, insider_name, "
+                "transaction_date, shares_after."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_insider_transactions(
+            symbol: str,
+            side: Optional[str] = None,
+            pagination_key: Optional[str] = None,
+        ) -> str:
+            """Get insider transaction records for a US stock.
+
+            Args:
+                symbol: Stock symbol (e.g. NVDA).
+                side: Transaction side filter: BUY or SELL. Default returns all.
+                pagination_key: Pagination key from the previous page response;
+                    not returned on the last page.
+            """
+            audit.log_tool_call("get_insider_transactions", {"symbol": symbol})
+            side = side.upper() if side else None
+            try:
+                data = extract_response_data(
+                    sdk.data.fundamentals.get_insider_transactions(
+                        symbol,
+                        category="US_STOCK",
+                        side=side,
+                        pagination_key=pagination_key,
+                    )
+                )
+                return prepend_disclaimer(format_insider_transactions(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_insider_transactions", config.region_id)
+
+        @mcp.tool(
+            description=(
+                "Get the insider ownership statistics overview for a US stock. "
+                "Returns: insiders_count, total_shares_held, ownership_pct and changes."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_insider_holdings(
+            symbol: str,
+            compare_months: int = 1,
+        ) -> str:
+            """Get the insider ownership statistics overview for a US stock.
+
+            Args:
+                symbol: Stock symbol (e.g. NVDA).
+                compare_months: Comparison period in months: 1 (default) or 3.
+            """
+            audit.log_tool_call("get_insider_holdings", {"symbol": symbol})
+            if compare_months not in {1, 3}:
+                return "Validation error: compare_months must be 1 or 3."
+            try:
+                data = extract_response_data(
+                    sdk.data.fundamentals.get_insider_holdings(
+                        symbol, category="US_STOCK", compare_months=compare_months,
+                    )
+                )
+                return prepend_disclaimer(format_insider_holdings_overview(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_insider_holdings", config.region_id)
+
+        @mcp.tool(
+            description=(
+                "Get the macroeconomic event calendar for a date range "
+                "(cursor-paginated, up to 30 events per page). "
+                "Returns: economic events with event_name, publish_date, period, "
+                "unit, frequency, prior_value, is_fed_related."
+            ),
+            annotations={"readOnlyHint": True},
+        )
+        async def get_macroeconomic_calendar(
+            start_date: Optional[str] = None,
+            end_date: Optional[str] = None,
+            pagination_key: Optional[str] = None,
+        ) -> str:
+            """Get the macroeconomic event calendar.
+
+            Args:
+                start_date: Start date in yyyy-MM-dd format. Defaults to today.
+                end_date: End date in yyyy-MM-dd format. Defaults to start date + 7 days.
+                pagination_key: Pagination key from the previous page response;
+                    not returned on the last page.
+            """
+            audit.log_tool_call(
+                "get_economic_calendar",
+                {"start_date": start_date, "end_date": end_date} if start_date or end_date else {},
+            )
+            try:
+                data = extract_response_data(
+                    sdk.data.fundamentals.get_economic_calendars(
+                        region="US",
+                        start_date=start_date,
+                        end_date=end_date,
+                        pagination_key=pagination_key,
+                    )
+                )
+                return prepend_disclaimer(format_economic_calendar(data))
+            except Exception as e:
+                return handle_sdk_exception(e, "get_macroeconomic_calendar", config.region_id)

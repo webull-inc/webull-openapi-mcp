@@ -713,28 +713,49 @@ def _format_order_extra_fields(detail: dict) -> list[str]:
     if detail.get("event_outcome"):
         lines.append(f"    Event Outcome:      {_get(detail, 'event_outcome')}")
 
-    # Option position intent
-    if detail.get("position_intent"):
-        lines.append(f"    Position Intent:    {_get(detail, 'position_intent')}")
+    # Option order context
+    option_fields = (
+        ("option_strategy", "Option Strategy"),
+        ("position_intent", "Position Intent"),
+        ("leg_in_or_out", "Leg In/Out"),
+        ("position_id", "Position ID"),
+        ("leg_in_strategy", "Leg In Strategy"),
+    )
+    for key, label in option_fields:
+        if detail.get(key) is not None:
+            lines.append(f"    {label + ':':<21}{_get(detail, key)}")
 
     return lines
 
 
 def _format_option_legs(legs: list[dict]) -> list[str]:
-    """Format option legs for an order detail."""
+    """Format option legs without dropping execution or contract identifiers."""
     lines: list[str] = ["\n    [Option Legs]"]
-    for j, leg in enumerate(legs, 1):
-        lines.append(f"      Leg {j}:")
-        lines.append(f"        Symbol:             {_get(leg, 'symbol')}")
-        lines.append(f"        Side:               {_get(leg, 'side')}")
-        lines.append(f"        Quantity:           {_get(leg, 'quantity')}")
-        lines.append(f"        Option Type:        {_get(leg, 'option_type')}")
-        lines.append(f"        Option Category:    {_get(leg, 'option_category')}")
-        lines.append(f"        Option Strategy:    {_get(leg, 'option_strategy')}")
-        lines.append(f"        Strike Price:       {_get(leg, 'strike_price')}")
-        lines.append(f"        Expire Date:        {_get(leg, 'option_expire_date')}")
-        lines.append(f"        Multiplier:         {_get(leg, 'option_contract_multiplier')}")
-        lines.append(f"        Deliverable:        {_get(leg, 'option_contract_deliverable')}")
+    fields = (
+        ("id", "Leg ID"),
+        ("instrument_id", "Instrument ID"),
+        ("symbol", "Symbol"),
+        ("instrument_type", "Instrument Type"),
+        ("market", "Market"),
+        ("side", "Side"),
+        ("quantity", "Quantity"),
+        ("total_quantity", "Total Quantity"),
+        ("filled_quantity", "Filled Quantity"),
+        ("filled_price", "Filled Price"),
+        ("status", "Status"),
+        ("option_type", "Option Type"),
+        ("option_category", "Option Category"),
+        ("option_strategy", "Option Strategy"),
+        ("strike_price", "Strike Price"),
+        ("option_expire_date", "Expire Date"),
+        ("option_contract_multiplier", "Multiplier"),
+        ("option_contract_deliverable", "Deliverable"),
+    )
+    for index, leg in enumerate(legs, 1):
+        lines.append(f"      Leg {index}:")
+        for key, label in fields:
+            if key in leg:
+                lines.append(f"        {label + ':':<22}{_get(leg, key)}")
     return lines
 
 
@@ -793,26 +814,41 @@ def format_order_preview(data: dict | None) -> str:
     return "\n".join(lines)
 
 
-def format_order_history(data: list[dict] | None) -> str:
-    """Format order history response."""
-    if not data:
+def _unwrap_order_page(data: Any) -> tuple[list[dict], str | None]:
+    """Extract order rows and the opaque next-page cursor."""
+    if isinstance(data, list):
+        return data, None
+    if not isinstance(data, dict):
+        return [], None
+    pagination_key = data.get("pagination_key") or data.get("next_pagination_key")
+    for key in ("data", "items", "orders", "result"):
+        value = data.get(key)
+        if isinstance(value, list):
+            return value, pagination_key
+    return [data], pagination_key
+
+
+def _format_order_page(data: Any, title: str, entry_label: str) -> str:
+    orders, pagination_key = _unwrap_order_page(data)
+    if not orders:
         return _NO_DATA
-    lines: list[str] = ["=== Order History ==="]
-    for i, order in enumerate(data, 1):
-        lines.append(f"\n[Order Entry {i}]")
+    lines: list[str] = [title]
+    for index, order in enumerate(orders, 1):
+        lines.append(f"\n[{entry_label} {index}]")
         lines.extend(_format_order_item(order))
+    if pagination_key:
+        lines.append(f"\nNext pagination_key: {pagination_key}")
     return "\n".join(lines)
 
 
-def format_open_orders(data: list[dict] | None) -> str:
-    """Format open orders response."""
-    if not data:
-        return _NO_DATA
-    lines: list[str] = ["=== Open Orders ==="]
-    for i, order in enumerate(data, 1):
-        lines.append(f"\n[Order Entry {i}]")
-        lines.extend(_format_order_item(order))
-    return "\n".join(lines)
+def format_order_history(data: Any) -> str:
+    """Format order history, grouped orders, option legs, and pagination."""
+    return _format_order_page(data, "=== Order History ===", "Order Entry")
+
+
+def format_open_orders(data: Any) -> str:
+    """Format open orders, grouped orders, option legs, and pagination."""
+    return _format_order_page(data, "=== Open Orders ===", "Order Entry")
 
 
 def format_order_detail(data: dict | None) -> str:
@@ -2312,3 +2348,228 @@ def format_fifty_two_week(data: Any) -> str:
         lines.append("\n  (More results available — increase page_size or page_index)")
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Community formatters
+# ---------------------------------------------------------------------------
+
+def format_community_create_result(data: Any) -> str:
+    """Format a create post / create comment response.
+
+    API returns the created identifier(s), e.g. {post_id} or {comment_id}.
+    """
+    if not data or not isinstance(data, dict):
+        return "Operation completed."
+
+    lines: list[str] = ["=== Community ==="]
+    post_id = data.get("post_id")
+    comment_id = data.get("comment_id")
+    if post_id is not None:
+        lines.append(f"  Post ID: {post_id}")
+    if comment_id is not None:
+        lines.append(f"  Comment ID: {comment_id}")
+    if post_id is None and comment_id is None:
+        # Fall back to showing whatever identifier the API returned.
+        for key, val in data.items():
+            lines.append(f"  {key}: {val}")
+    return "\n".join(lines)
+
+
+def format_community_hot_stocks(data: Any) -> str:
+    """Format the community hot stocks ranking response.
+
+    API returns a list (or {data: [...]}) of {rank, symbol, category}.
+    """
+    if not data:
+        return _NO_DATA
+
+    items = data.get("data", []) if isinstance(data, dict) else data
+    if not items:
+        return _NO_DATA
+
+    lines: list[str] = ["=== Community Hot Stocks ==="]
+    for item in items:
+        if isinstance(item, dict):
+            lines.append(
+                f"  #{_get(item, 'rank')}  {_get(item, 'symbol')}  "
+                f"({_get(item, 'category')})"
+            )
+    return "\n".join(lines)
+
+
+def _format_community_post_item(item: dict) -> str:
+    """Format a single community post list entry."""
+    lines = [
+        f"  Post ID: {_get(item, 'post_id')}",
+        f"    Text: {_get(item, 'text')}",
+        f"    Publish Time: {_get(item, 'publish_time')}",
+        f"    Thumbs: {_get(item, 'thumbs')}  Comments: {_get(item, 'comments')}",
+    ]
+    return "\n".join(lines)
+
+
+def format_community_post_list(data: Any, title: str = "Posts") -> str:
+    """Format a paginated community post list response.
+
+    API returns {data: [{post_id, text, publish_time, thumbs, comments, ...}],
+    pagination_key: str}.
+    """
+    if not data:
+        return _NO_DATA
+
+    items = data.get("data", []) if isinstance(data, dict) else data
+    if not items:
+        return _NO_DATA
+
+    lines: list[str] = [f"=== Community {title} ==="]
+    for item in items:
+        if isinstance(item, dict):
+            lines.append(_format_community_post_item(item))
+
+    pagination_key = data.get("pagination_key") if isinstance(data, dict) else None
+    if pagination_key:
+        lines.append(f"\n  (More results available — pass pagination_key={pagination_key})")
+    return "\n".join(lines)
+
+
+def format_community_post_detail(data: Any) -> str:
+    """Format a community post detail response.
+
+    API returns {post_id, text, publish_time, thumbs, comments,
+    tickers: [{symbol, category}]}.
+    """
+    if not data or not isinstance(data, dict):
+        return _NO_DATA
+
+    lines: list[str] = ["=== Community Post Detail ==="]
+    lines.append(f"  Post ID: {_get(data, 'post_id')}")
+    lines.append(f"  Text: {_get(data, 'text')}")
+    lines.append(f"  Publish Time: {_get(data, 'publish_time')}")
+    lines.append(f"  Thumbs: {_get(data, 'thumbs')}  Comments: {_get(data, 'comments')}")
+
+    tickers = data.get("tickers")
+    if isinstance(tickers, list) and tickers:
+        lines.append("  Tickers:")
+        for ticker in tickers:
+            if isinstance(ticker, dict):
+                lines.append(
+                    f"    {_get(ticker, 'symbol')} ({_get(ticker, 'category')})"
+                )
+    return "\n".join(lines)
+
+
+def _format_paginated_list(data: Any, title: str) -> str:
+    """Shared formatter for cursor-paginated insight/news list responses.
+
+    API returns {data: [...], pagination_key: "..."}: pass the pagination_key
+    back to fetch the next page; it is absent on the last page. Bare-dict or
+    list responses are rendered as single/multiple items without a cursor.
+    """
+    if isinstance(data, dict):
+        items = data.get("data")
+        items = items if isinstance(items, list) else [data]
+    else:
+        items = data
+    if not items:
+        return _NO_DATA
+
+    lines: list[str] = [f"=== {title} ==="]
+    for i, item in enumerate(items, 1):
+        if not isinstance(item, dict):
+            continue
+        lines.append(f"\n[{i}]")
+        for key, value in item.items():
+            if value is not None:
+                lines.append(f"  {key}: {value}")
+
+    if isinstance(data, dict):
+        pagination_key = data.get("pagination_key") or data.get("next_pagination_key")
+        if pagination_key:
+            lines.append(f"\nNext pagination_key: {pagination_key}")
+
+    return "\n".join(lines)
+
+
+def format_market_sentiment(data: Any) -> str:
+    """Format fear & greed sentiment index response.
+
+    API returns: {current, previous_day, one_week_ago, one_month_ago, time_zone}
+    where each point is {fear_greed_index, grade}.
+    """
+    if not data or not isinstance(data, dict):
+        return _NO_DATA
+
+    lines: list[str] = [f"=== Market Sentiment Index ({_get(data, 'time_zone')}) ==="]
+    for point, label in (
+        ("current", "Current"),
+        ("previous_day", "Previous Day"),
+        ("one_week_ago", "One Week Ago"),
+        ("one_month_ago", "One Month Ago"),
+    ):
+        stats = data.get(point)
+        if not isinstance(stats, dict):
+            continue
+        stamp = f"{_get(stats, 'date')} {_get(stats, 'time')}".strip()
+        if stamp and stamp != "N/A N/A":
+            lines.append(f"  {label:<13s}  Time: {stamp}")
+        lines.append(
+            f"  {'':13s}  Index: {_get(stats, 'fear_greed_index'):>4s}  "
+            f"Grade: {_get(stats, 'grade')}"
+        )
+
+    return "\n".join(lines)
+
+
+def format_stock_unusual_activities(data: Any) -> str:
+    """Format unusual activity alert response."""
+    return _format_paginated_list(data, "Stock Unusual Activities")
+
+
+def format_institution_search(data: Any) -> str:
+    """Format institution keyword-search response."""
+    return _format_paginated_list(data, "Institution Search")
+
+
+def format_institution_holdings(data: Any) -> str:
+    """Format institution 13F holdings response."""
+    return _format_paginated_list(data, "Institution 13F Holdings")
+
+
+def format_institution_holding_changes(data: Any) -> str:
+    """Format institution holding-changes response."""
+    return _format_paginated_list(data, "Institution Holding Changes")
+
+
+def format_insider_transactions(data: Any) -> str:
+    """Format insider transaction response."""
+    return _format_paginated_list(data, "Insider Transactions")
+
+
+def format_insider_holdings_overview(data: Any) -> str:
+    """Format insider holdings overview response.
+
+    API returns: {symbol, insiders_count, total_shares_held, ownership_pct,
+    compare_months, changes: [...]}
+    """
+    return _format_paginated_list(data, "Insider Holdings Overview")
+
+
+def format_economic_calendar(data: Any) -> str:
+    """Format US economic calendar response."""
+    return _format_paginated_list(data, "US Economic Calendar")
+
+
+def format_news_search(data: Any) -> str:
+    """Format news keyword-search response."""
+    return _format_paginated_list(data, "News Keyword Search")
+
+
+def format_news_detail(data: Any) -> str:
+    """Format news detail response."""
+    return _format_paginated_list(data, "News Detail")
+
+
+def format_stock_news(data: Any) -> str:
+    """Format stock news list response."""
+    return _format_paginated_list(data, "Stock News List")

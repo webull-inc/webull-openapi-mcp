@@ -58,7 +58,7 @@ class RegionValidationError(ValidationError):
         self.region_id = region_id
         self.valid_values = valid_values
         message = (
-            f"Invalid {param_name} '{value}' for region '{region_id}'. "
+            f"Invalid {param_name} for region '{region_id}'. "
             f"Valid values: {', '.join(sorted(valid_values))}"
         )
         super().__init__(message, field=param_name)
@@ -94,6 +94,20 @@ MARKET_DATA_TOOLS = frozenset({
     "get_event_snapshot",
     "get_event_depth",
     "get_event_bars",
+    "get_option_tick",
+    "get_option_snapshot",
+    "get_option_bars",
+    "get_market_sentiment",
+    "get_stock_unusual_activities",
+    "get_institution_identifier",
+    "get_institution_holdings",
+    "get_institution_holding_changes",
+    "get_insider_transactions",
+    "get_insider_holdings",
+    "get_macroeconomic_calendar",
+    "search_news",
+    "get_news_detail",
+    "get_stock_news",
 })
 
 # Region-specific subscription guidance
@@ -118,6 +132,26 @@ MARKET_DATA_SUBSCRIPTION_HINTS: dict[str, str] = {
         "Subscribe at: https://www.webull.com.mx/quote\n"
         "Guide: https://developer.webull.com.mx/apis/docs/market-data-api/subscribe-quotes"
     ),
+    "my": (
+        "Market data requires quotes subscription.\n"
+        "Subscribe at: https://www.webull.com.my/quote\n"
+        "Guide: https://developer.webull.com.my/apis/docs/market-data-api/subscribe-quotes"
+    ),
+    "sg": (
+        "Market data requires quotes subscription.\n"
+        "Subscribe at: https://www.webull.com.sg/quote\n"
+        "Guide: https://developer.webull.com.sg/apis/docs/market-data-api/subscribe-quotes"
+    ),
+    "th": (
+        "Market data requires quotes subscription.\n"
+        "Subscribe at: https://www.webull.co.th/quote\n"
+        "Guide: https://developer.webull.co.th/apis/docs/market-data-api/subscribe-quotes"
+    ),
+    "uk": (
+        "Market data requires quotes subscription.\n"
+        "Subscribe at: https://www.webull-uk.com/quote\n"
+        "Guide: https://developer.webull-uk.com/apis/docs/market-data-api/subscribe-quotes"
+    ),
     "us": (
         "Market data requires quotes subscription.\n"
         "Subscribe at: https://www.webullapp.com/quote\n"
@@ -130,19 +164,22 @@ def _get_market_data_hint(region_id: str | None = None) -> str:
     """Get market data subscription hint for the given region."""
     if region_id and region_id.lower() in MARKET_DATA_SUBSCRIPTION_HINTS:
         return MARKET_DATA_SUBSCRIPTION_HINTS[region_id.lower()]
-    # Fallback: show both
-    return (
-        "Market data requires quotes subscription.\n\n"
-        "HK region:\n"
-        "  Subscribe: https://www.webullapp.hk/quote\n"
-        "  Guide: https://developer.webull.hk/apis/docs/market-data-api/subscribe-quotes\n\n"
-        "US region:\n"
-        "  Subscribe: https://www.webullapp.com/quote\n"
-        "  Guide: https://developer.webull.com/apis/docs/market-data-api/subscribe-quotes"
-        "\n\nJP region:\n"
-        "  Subscribe: https://www.webull.co.jp/pricing\n"
-        "  Guide: https://developer.webull.co.jp/api-doc/market-data/subscribe-quotes/"
-    )
+    # Fallback: list every supported region so the user can find their own.
+    lines = ["Market data requires quotes subscription.", ""]
+    for code in sorted(MARKET_DATA_SUBSCRIPTION_HINTS):
+        hint = MARKET_DATA_SUBSCRIPTION_HINTS[code]
+        subscribe = ""
+        guide = ""
+        for raw in hint.split("\n"):
+            if raw.startswith("Subscribe at: "):
+                subscribe = raw[len("Subscribe at: "):]
+            elif raw.startswith("Guide: "):
+                guide = raw[len("Guide: "):]
+        lines.append(f"{code.upper()} region:")
+        lines.append(f"  Subscribe: {subscribe}")
+        lines.append(f"  Guide: {guide}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
 
 
 def handle_sdk_exception(e: Exception, tool_name: str, region_id: str | None = None) -> str:

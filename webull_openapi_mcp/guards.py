@@ -9,6 +9,9 @@ Provides unified order validation including:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
+import re
 from typing import TYPE_CHECKING
 
 from webull_openapi_mcp.constants import (
@@ -18,6 +21,8 @@ from webull_openapi_mcp.constants import (
     VALID_MARGIN_TYPES,
     VALID_OPTION_ORDER_TYPES,
     VALID_OPTION_TIF,
+    VALID_OPTION_TYPES,
+    VALID_POSITION_INTENTS,
     VALID_SIDES,
 )
 from webull_openapi_mcp.errors import (
@@ -32,13 +37,12 @@ from webull_openapi_mcp.errors import (
 # ---------------------------------------------------------------------------
 
 _MAX_CLIENT_ORDER_ID_LEN = 32
+_MAX_PAGINATION_KEY_LEN = 2048
+_CLIENT_ORDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def validate_client_order_id(client_order_id: str | None) -> None:
-    """Validate client_order_id: max 32 chars, non-empty if provided.
-
-    Raises ValidationError if invalid.
-    """
+    """Validate a public client order ID when one is provided."""
     if client_order_id is None:
         return
     if not client_order_id:
@@ -49,6 +53,128 @@ def validate_client_order_id(client_order_id: str | None) -> None:
             f"(got {len(client_order_id)})",
             field="client_order_id",
         )
+    if not _CLIENT_ORDER_ID_PATTERN.fullmatch(client_order_id):
+        raise ValidationError(
+            "client_order_id may contain only letters, numbers, underscores, and hyphens",
+            field="client_order_id",
+        )
+
+
+def validate_pagination_key(pagination_key: str | None) -> None:
+    """Validate an opaque pagination cursor without interpreting it."""
+    if pagination_key is None:
+        return
+    if not isinstance(pagination_key, str) or not pagination_key:
+        raise ValidationError("pagination_key must not be empty", field="pagination_key")
+    if len(pagination_key) > _MAX_PAGINATION_KEY_LEN:
+        raise ValidationError(
+            f"pagination_key exceeds max length of {_MAX_PAGINATION_KEY_LEN} characters",
+            field="pagination_key",
+        )
+
+
+def validate_enum(value: str | None, valid_values: frozenset[str], field: str) -> None:
+    """Validate an optional enum value against an explicit allowlist."""
+    if value is not None and value not in valid_values:
+        raise ValidationError(
+            f"Invalid {field}, must be one of {sorted(valid_values)}",
+            field=field,
+        )
+
+
+def validate_positive_decimal(value: object, field: str) -> None:
+    """Validate a finite decimal value greater than zero."""
+    if isinstance(value, bool):
+        raise ValidationError(f"{field} must be a positive decimal", field=field)
+    try:
+        decimal_value = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValidationError(f"{field} must be a positive decimal", field=field)
+    if not decimal_value.is_finite() or decimal_value <= 0:
+        raise ValidationError(f"{field} must be a positive decimal", field=field)
+
+
+def validate_positive_whole_number(value: object, field: str, maximum: int | None = None) -> None:
+    """Validate a positive whole number with an optional upper bound.
+
+    Only genuine integers (or integer-valued strings) are accepted. Booleans are
+    rejected because bool is a subclass of int in Python, and floats are rejected
+    even when integer-valued (e.g. 1.0) to avoid silently coercing non-integer
+    inputs into a quantity.
+    """
+    if isinstance(value, bool) or isinstance(value, float):
+        raise ValidationError(f"{field} must be a positive whole number", field=field)
+    try:
+        decimal_value = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValidationError(f"{field} must be a positive whole number", field=field)
+    if not decimal_value.is_finite() or decimal_value <= 0 or decimal_value != decimal_value.to_integral_value():
+        raise ValidationError(f"{field} must be a positive whole number", field=field)
+    if maximum is not None and decimal_value > maximum:
+        raise ValidationError(f"{field} must be between 1 and {maximum}", field=field)
+
+
+def validate_symbol_list(symbols: str, field: str = "symbols", maximum: int = 20) -> list[str]:
+    """Validate and split a comma-separated symbol list."""
+    if not isinstance(symbols, str):
+        raise ValidationError(f"{field} must be a comma-separated string", field=field)
+    values = [symbol.strip() for symbol in symbols.split(",") if symbol.strip()]
+    if not values:
+        raise ValidationError(f"{field} must include at least one symbol", field=field)
+    if len(values) > maximum:
+        raise ValidationError(f"{field} supports at most {maximum} symbols", field=field)
+    return values
+
+
+def validate_iso_date(value: str | None, field: str) -> None:
+    """Validate an optional ISO calendar date."""
+    if value is None:
+        return
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        raise ValidationError(f"{field} must use YYYY-MM-DD format", field=field)
+
+
+def _parse_iso_utc_time(value: str, field: str) -> datetime:
+    if not isinstance(value, str) or "T" not in value or not value.endswith("Z"):
+        raise ValidationError(f"{field} must be an ISO 8601 UTC timestamp ending in Z", field=field)
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        raise ValidationError(f"{field} must be a valid ISO 8601 UTC timestamp", field=field)
+    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        raise ValidationError(f"{field} must be in UTC", field=field)
+    return parsed
+
+
+def validate_iso_utc_range(start_time: str | None, end_time: str | None) -> None:
+    """Validate optional UTC timestamps and their chronological order."""
+    start = _parse_iso_utc_time(start_time, "start_time") if start_time is not None else None
+    end = _parse_iso_utc_time(end_time, "end_time") if end_time is not None else None
+    if start is not None and end is not None and start > end:
+        raise ValidationError("start_time must not be later than end_time", field="start_time")
+
+
+def normalize_iso_utc_millis(value: str | None) -> str | None:
+    """Normalize a second-precision ISO 8601 UTC timestamp to millisecond form.
+
+    The backend requires millisecond precision (e.g. 2026-10-01T00:00:00.000Z) and
+    rejects second-precision input (e.g. 2026-10-01T00:00:00Z). Callers stay lenient
+    and accept both forms; this helper upgrades a second-precision value to
+    millisecond form before the request is sent while preserving the Z/UTC marker.
+    A value that already carries a fractional-seconds component is returned
+    unchanged, so milliseconds are never double-appended.
+
+    Returns None when value is None. Values that are not second-precision
+    ...SSZ timestamps are returned unchanged; validation is expected to have run
+    separately (see validate_iso_utc_range).
+    """
+    if value is None:
+        return value
+    if not isinstance(value, str) or not value.endswith("Z") or "." in value:
+        return value
+    return value[:-1] + ".000Z"
 
 
 def validate_close_contracts(close_contracts: object) -> None:
@@ -154,8 +280,10 @@ class OrderValidator:
                 self._validate_time_in_force(order.get("time_in_force"))
 
     def validate_option_order(self, params: dict) -> None:
-        """Validate single-leg option order parameters."""
-        self._validate_side(params.get("side"))
+        """Validate a single-leg US-listed option order."""
+        side = params.get("side")
+        if side not in {"BUY", "SELL"}:
+            raise ValidationError("side must be BUY or SELL for option orders", field="side")
         self._validate_option_order_type(params.get("order_type"))
         self._validate_option_tif(params.get("time_in_force"))
         self._validate_option_price_fields(
@@ -163,6 +291,41 @@ class OrderValidator:
             params.get("limit_price"),
             params.get("stop_price"),
         )
+        if "quantity" in params:
+            max_quantity = self.server_config.max_order_quantity
+            validate_positive_whole_number(
+                params.get("quantity"),
+                "quantity",
+                maximum=int(max_quantity) if max_quantity is not None else None,
+            )
+        if "strike_price" in params:
+            validate_positive_decimal(params.get("strike_price"), "strike_price")
+        validate_enum(params.get("option_type"), VALID_OPTION_TYPES, "option_type")
+        validate_enum(params.get("position_intent"), VALID_POSITION_INTENTS, "position_intent")
+        validate_iso_date(params.get("expiration_date"), "expiration_date")
+        if "symbol" in params:
+            symbol = params.get("symbol")
+            if not isinstance(symbol, str) or not symbol.strip():
+                raise ValidationError("symbol must not be empty", field="symbol")
+            self._validate_symbol_whitelist(symbol)
+        # JP requires account_tax_type on option orders (same as stock orders).
+        if self.region_config.region_id == "jp":
+            account_tax_type = params.get("account_tax_type")
+            if account_tax_type is None:
+                raise ValidationError(
+                    "account_tax_type is required for JP option orders", field="account_tax_type"
+                )
+            if account_tax_type not in VALID_ACCOUNT_TAX_TYPES:
+                raise ValidationError(
+                    "Invalid account_tax_type, "
+                    f"must be one of {sorted(VALID_ACCOUNT_TAX_TYPES)}",
+                    field="account_tax_type",
+                )
+            if params.get("position_intent") is None:
+                raise ValidationError(
+                    "position_intent is required for JP option orders",
+                    field="position_intent",
+                )
 
     def validate_option_strategy_order(self, params: dict) -> None:
         """Validate option strategy order parameters (US only)."""
@@ -199,7 +362,7 @@ class OrderValidator:
         valid_algo_types = {"TWAP", "VWAP", "POV"}
         if algo_type not in valid_algo_types:
             raise ValidationError(
-                f"Invalid algo_type '{algo_type}'. Valid values: {', '.join(sorted(valid_algo_types))}",
+                f"Invalid algo_type. Valid values: {', '.join(sorted(valid_algo_types))}",
                 field="algo_type",
             )
         
@@ -218,7 +381,7 @@ class OrderValidator:
         """Validate trade side."""
         if side not in VALID_SIDES:
             raise ValidationError(
-                f"Invalid side '{side}', must be one of {sorted(VALID_SIDES)}",
+                f"Invalid side, must be one of {sorted(VALID_SIDES)}",
                 field="side",
             )
 
@@ -232,12 +395,12 @@ class OrderValidator:
         """
         if quantity is None or quantity <= 0:
             raise ValidationError(
-                f"quantity must be > 0, got {quantity}",
+                "quantity must be > 0",
                 field="quantity",
             )
         if quantity > self.server_config.max_order_quantity:
             raise ValidationError(
-                f"quantity {quantity} exceeds max_order_quantity {self.server_config.max_order_quantity}",
+                f"quantity exceeds max_order_quantity {self.server_config.max_order_quantity}",
                 field="quantity",
             )
         
@@ -248,8 +411,8 @@ class OrderValidator:
             
             if notional > max_notional:
                 raise ValidationError(
-                    f"Notional value {notional:.2f} {currency} "
-                    f"exceeds max_order_notional_{currency.lower()} {max_notional:.2f}",
+                    f"Notional value exceeds max_order_notional_{currency.lower()} "
+                    f"{max_notional:.2f} {currency}",
                     field="notional",
                 )
 
@@ -273,7 +436,7 @@ class OrderValidator:
         """Validate symbol against whitelist if configured."""
         if self.server_config.symbol_whitelist is not None and symbol not in self.server_config.symbol_whitelist:
             raise ValidationError(
-                f"Symbol '{symbol}' is not in the allowed whitelist",
+                "symbol is not in the allowed whitelist",
                 field="symbol",
             )
 
@@ -283,7 +446,7 @@ class OrderValidator:
             return  # Optional, defaults to QTY in order tools
         if entrust_type not in VALID_ENTRUST_TYPES:
             raise ValidationError(
-                f"Invalid entrust_type '{entrust_type}', must be one of {sorted(VALID_ENTRUST_TYPES)}",
+                f"Invalid entrust_type, must be one of {sorted(VALID_ENTRUST_TYPES)}",
                 field="entrust_type",
             )
 
@@ -317,7 +480,7 @@ class OrderValidator:
             valid = market_order_types.get(market.upper())
             if valid and order_type not in valid:
                 raise ValidationError(
-                    f"Invalid order_type '{order_type}' for {market} market. "
+                    f"Invalid order_type for {market} market. "
                     f"Valid values: {', '.join(sorted(valid))}",
                     field="order_type",
                 )
@@ -353,7 +516,7 @@ class OrderValidator:
             valid = market_tif.get(market.upper())
             if valid and tif not in valid:
                 raise ValidationError(
-                    f"Invalid time_in_force '{tif}' for {market} market. "
+                    f"Invalid time_in_force for {market} market. "
                     f"Valid values: {', '.join(sorted(valid))}",
                     field="time_in_force",
                 )
@@ -368,7 +531,7 @@ class OrderValidator:
             valid = market_tif.get(market.upper())
             if valid and tif not in valid:
                 raise ValidationError(
-                    f"Invalid time_in_force '{tif}' for {market} market. "
+                    f"Invalid time_in_force for {market} market. "
                     f"Valid values: {', '.join(sorted(valid))}",
                     field="time_in_force",
                 )
@@ -464,7 +627,7 @@ class OrderValidator:
             raise ValidationError("account_tax_type is required for JP orders", field="account_tax_type")
         if account_tax_type not in VALID_ACCOUNT_TAX_TYPES:
             raise ValidationError(
-                f"Invalid account_tax_type '{account_tax_type}', "
+                "Invalid account_tax_type, "
                 f"must be one of {sorted(VALID_ACCOUNT_TAX_TYPES)}",
                 field="account_tax_type",
             )
@@ -472,7 +635,7 @@ class OrderValidator:
         margin_type = params.get("margin_type")
         if margin_type is not None and margin_type not in VALID_MARGIN_TYPES:
             raise ValidationError(
-                f"Invalid margin_type '{margin_type}', must be one of {sorted(VALID_MARGIN_TYPES)}",
+                f"Invalid margin_type, must be one of {sorted(VALID_MARGIN_TYPES)}",
                 field="margin_type",
             )
 
@@ -486,7 +649,7 @@ class OrderValidator:
         """Validate option order type."""
         if order_type not in VALID_OPTION_ORDER_TYPES:
             raise ValidationError(
-                f"Invalid option order_type '{order_type}', must be one of {sorted(VALID_OPTION_ORDER_TYPES)}",
+                f"Invalid option order_type, must be one of {sorted(VALID_OPTION_ORDER_TYPES)}",
                 field="order_type",
             )
 
@@ -494,19 +657,22 @@ class OrderValidator:
         """Validate option time-in-force."""
         if tif not in VALID_OPTION_TIF:
             raise ValidationError(
-                f"Invalid option time_in_force '{tif}', must be one of {sorted(VALID_OPTION_TIF)}",
+                f"Invalid option time_in_force, must be one of {sorted(VALID_OPTION_TIF)}",
                 field="time_in_force",
             )
 
     def _validate_option_price_fields(
         self, order_type: str | None, limit_price: float | None, stop_price: float | None
     ) -> None:
-        """Validate option price fields based on order type."""
-        if order_type == "LIMIT" and limit_price is None:
-            raise ValidationError("LIMIT option order requires 'limit_price' field", field="limit_price")
-        
+        """Validate required option prices and reject non-positive values."""
+        if order_type in ("LIMIT", "STOP_LOSS_LIMIT") and limit_price is None:
+            raise ValidationError(f"{order_type} option order requires 'limit_price' field", field="limit_price")
         if order_type in ("STOP_LOSS", "STOP_LOSS_LIMIT") and stop_price is None:
             raise ValidationError(f"{order_type} option order requires 'stop_price' field", field="stop_price")
+        if limit_price is not None:
+            validate_positive_decimal(limit_price, "limit_price")
+        if stop_price is not None:
+            validate_positive_decimal(stop_price, "stop_price")
 
     def _validate_option_strategy(self, strategy: str | None) -> None:
         """Validate option strategy (US only for multi-leg)."""
@@ -543,12 +709,12 @@ class OrderValidator:
         if leg_count < min_legs or leg_count > max_legs:
             if min_legs == max_legs:
                 raise ValidationError(
-                    f"Strategy '{strategy}' requires exactly {min_legs} leg(s), but {leg_count} provided",
+                    f"strategy requires exactly {min_legs} leg(s)",
                     field="legs",
                 )
             else:
                 raise ValidationError(
-                    f"Strategy '{strategy}' requires {min_legs}-{max_legs} legs, but {leg_count} provided",
+                    f"strategy requires {min_legs}-{max_legs} legs",
                     field="legs",
                 )
 
