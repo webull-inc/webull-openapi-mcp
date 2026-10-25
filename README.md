@@ -24,6 +24,7 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full disclaimer.
 - **NOII Data** — Net Order Imbalance Indicator bars and snapshots for US stock opening/closing auctions
 - **Screener** — Top gainers/losers, most active, market sectors, high dividend, and 52-week high/low rankings
 - **Watchlist** — Create, manage, and query user watchlists and instruments
+- **Community** (US only) — Create posts and comments, list hot stocks, browse posts by symbol, view post details, and list your own posts
 - **Fundamental Data** — Company profiles, analyst ratings, and target prices
 - **Stock & Fund Fundamentals** — Capital flow, SEC filings, earnings/dividend calendar, forecast EPS, industry comparison, and full fund data (rating, performance, allocation, holdings, brief, dividends, splits, net value, files)
 - **Financial Statements** — Financial alert, indicators, income statement, balance sheet, and cash flow
@@ -62,6 +63,12 @@ Here are some prompts you can use with your AI assistant:
 - Create a new watchlist called "Tech Stocks"
 - Add AAPL and MSFT to my watchlist
 - What stocks are in my watchlist?
+
+**Community**
+- What are the community hot stocks right now?
+- Show me recent community posts about NVDA
+- Post "Great earnings report!" tagged with AAPL
+- List my community posts
 
 **Fundamental & Analyst**
 - Tell me about NVDA's company profile
@@ -303,8 +310,11 @@ See [.env.example](.env.example) for full configuration template.
 | **Crypto** | `get_crypto_snapshot`, `get_crypto_bars`                                                                                                                                                               | US |
 | **Option** | `get_option_tick`, `get_option_snapshot`, `get_option_bars`                                                                                                                                            | US, HK, JP |
 | **Event** | `get_event_tick`, `get_event_snapshot`, `get_event_depth`, `get_event_bars`                                                                                                                            | US |
+| **Market Insights** | `get_market_sentiment`, `get_stock_unusual_activities`, `get_institution_identifier`, `get_institution_holdings`, `get_institution_holding_changes`, `get_insider_transactions`, `get_insider_holdings`, `get_macroeconomic_calendar` | US |
+| **News** | `search_news`, `get_news_detail`, `get_stock_news` | US |
 | **Screener** | `get_gainers_losers`, `get_most_active`, `get_market_sectors`, `get_market_sectors_detail`, `get_high_dividend`, `get_52_week_high_low`                                                                                                                                                              | All |
 | **Watchlist** | `get_watchlists`, `create_watchlist`, `update_watchlist`, `delete_watchlist`, `get_watchlist_instruments`, `add_watchlist_instruments`, `remove_watchlist_instruments`, `update_watchlist_instruments` | All |
+| **Community** | `create_community_post`, `create_community_comment`, `get_community_hot_stocks`, `get_community_posts`, `get_community_post_detail`, `get_my_community_posts` | US |
 
 ### Fundamental & Instrument
 
@@ -402,7 +412,7 @@ All commands accept `--env-file PATH` to specify a custom `.env` file location (
 - **Review before trading** — Always review order details proposed by the AI before confirming. Use `preview_stock_order` / `preview_option_order` before placing orders.
 - **Use toolset filtering** — Set `WEBULL_TOOLSETS=account,market-data` to disable trading tools entirely if you only need read-only access. Valid toolsets: `account`, `market-data`, `trading`, `instrument`.
 - **Default sandbox** — The server defaults to UAT (sandbox) environment. You must explicitly set `WEBULL_ENVIRONMENT=prod` for live trading.
-- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `3.0.0`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
+- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `3.0.4`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
 
 ---
 
@@ -498,6 +508,7 @@ webull-openapi-mcp/
 │       │   ├── event.py    # Event contract market data
 │       │   ├── screener.py # Gainers/losers, most active, market sectors, high dividend, 52-week high/low
 │       │   ├── watchlist.py# Watchlist CRUD and instrument management
+│       │   ├── community.py # Community posts, comments, hot stocks
 │       │   ├── fundamental.py # Company profile, analyst data; stock & fund fundamentals (US/HK/JP)
 │       │   └── financial.py   # Financial statements: alert, indicators, income, balance sheet, cash flow (US/HK/JP)
 │       └── trading/

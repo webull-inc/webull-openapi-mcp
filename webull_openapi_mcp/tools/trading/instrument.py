@@ -7,9 +7,16 @@ Provides: get_instruments, get_futures_instruments, get_futures_products,
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Optional
 
-from webull_openapi_mcp.errors import handle_sdk_exception
+from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
+from webull_openapi_mcp.guards import (
+    validate_enum,
+    validate_iso_date,
+    validate_pagination_key,
+    validate_positive_decimal,
+)
 from webull_openapi_mcp.formatters import (
     extract_response_data,
     format_event_categories,
@@ -311,78 +318,146 @@ def register_instrument_tools(
             except Exception as e:
                 return handle_sdk_exception(e, "get_event_events")
 
-    if region_config.region_id in ("us", "hk", "jp"):
+    if region_config.supports_options:
         @mcp.tool(
             description=(
-                "Get option contract list by underlying symbols and filters.\n"
-                "Supported regions: US, HK, JP. category: US_OPTION.\n"
-                "underlying_symbols: Comma-separated underlying symbols, e.g. AAPL,MSFT.\n"
-                "option_type: CALL or PUT (optional).\n"
-                "start_date/end_date: Expiration date range, format YYYY-MM-DD.\n"
-                "strike_price_gte/strike_price_lte: Strike price range filter.\n"
-                "status: LISTING (default), DELISTING.\n"
-                "page_size: Default 10, max 1000.\n"
-                "Returns: option_symbol, underlying_symbol, option_type, strike_price, "
-                "expiration_date, style, status."
+                "List US-listed option contracts using the current cursor protocol.\n"
+                "category: US_OPTION only. option_symbols/underlying_symbols: comma-separated filters.\n"
+                "status: LISTING or DELISTING. option_type: CALL or PUT.\n"
+                "style: AMERICAN or EUROPEAN.\n"
+                "start_date: exact expiration date to match (YYYY-MM-DD).\n"
+                "end_date: inclusive lower bound of the expiration date (YYYY-MM-DD).\n"
+                "pagination_key: previous-page cursor.\n"
+                "Returns contract identifiers, terms, exchanges, deliverables, and the next cursor."
             ),
             annotations={"readOnlyHint": True},
         )
         async def get_option_contracts(
-            underlying_symbols: str,
             category: str = "US_OPTION",
-            option_type: Optional[str] = None,
+            option_symbols: Optional[str] = None,
+            underlying_symbols: Optional[str] = None,
             status: Optional[str] = None,
             start_date: Optional[str] = None,
             end_date: Optional[str] = None,
             root_symbol: Optional[str] = None,
-            option_symbol: Optional[str] = None,
+            option_type: Optional[str] = None,
             style: Optional[str] = None,
             strike_price_gte: Optional[str] = None,
             strike_price_lte: Optional[str] = None,
-            page_size: int = 10,
-            last_instrument_id: Optional[str] = None,
+            ppind: Optional[bool] = None,
+            show_deliverables: Optional[bool] = None,
+            pagination_key: Optional[str] = None,
         ) -> str:
-            """Get option contract list by underlying symbols and filters."""
-            audit.log_tool_call("get_option_contracts", {"underlying_symbols": underlying_symbols})
+            """List option contracts using the list_option_contracts cursor endpoint."""
+            audit.log_tool_call(
+                "get_option_contracts",
+                {"option_symbols": option_symbols, "underlying_symbols": underlying_symbols},
+            )
+            try:
+                validate_enum(category, frozenset({"US_OPTION"}), "category")
+                validate_enum(status, frozenset({"LISTING", "DELISTING"}), "status")
+                validate_enum(option_type, frozenset({"CALL", "PUT"}), "option_type")
+                validate_enum(style, frozenset({"AMERICAN", "EUROPEAN"}), "style")
+                validate_iso_date(start_date, "start_date")
+                validate_iso_date(end_date, "end_date")
+                validate_pagination_key(pagination_key)
+                if strike_price_gte is not None:
+                    validate_positive_decimal(strike_price_gte, "strike_price_gte")
+                if strike_price_lte is not None:
+                    validate_positive_decimal(strike_price_lte, "strike_price_lte")
+                if strike_price_gte is not None and strike_price_lte is not None:
+                    if Decimal(str(strike_price_gte)) > Decimal(str(strike_price_lte)):
+                        raise ValidationError(
+                            "strike_price_gte must not exceed strike_price_lte",
+                            field="strike_price_gte",
+                        )
+            except ValidationError as e:
+                return f"Validation error: {e.message}"
+
             try:
                 kwargs = _build_kwargs(
                     {"category": category},
+                    option_symbols=option_symbols,
                     underlying_symbols=underlying_symbols,
                     status=status,
                     start_date=start_date,
                     end_date=end_date,
                     root_symbol=root_symbol,
-                    option_symbol=option_symbol,
                     option_type=option_type,
                     style=style,
                     strike_price_gte=strike_price_gte,
                     strike_price_lte=strike_price_lte,
-                    page_size=page_size,
-                    last_instrument_id=last_instrument_id,
+                    ppind=ppind,
+                    show_deliverables=show_deliverables,
+                    pagination_key=pagination_key,
                 )
-                data = extract_response_data(sdk.data.instrument.get_option_contracts(**kwargs))
+                data = extract_response_data(sdk.data.instrument.list_option_contracts(**kwargs))
                 return prepend_disclaimer(_format_option_contracts(data))
             except Exception as e:
                 return handle_sdk_exception(e, "get_option_contracts")
 
 
 def _format_option_contracts(data) -> str:
-    """Format option contracts list."""
+    """Format option contracts and preserve pagination and deliverables."""
     if not data:
         return "No option contracts found."
+
+    pagination_key = None
+    contracts = data
     if isinstance(data, dict):
-        data = [data]
-    if not isinstance(data, list):
+        pagination_key = data.get("pagination_key") or data.get("next_pagination_key")
+        # Presence-aware extraction: an empty list [] is a valid "no results"
+        # response, so check key presence instead of truthiness. Falling back to
+        # [data] only when no contracts key exists avoids wrapping an empty
+        # envelope as a fake all-N/A contract (API-1957).
+        nested = None
+        for key in ("data", "items", "result"):
+            if key in data:
+                nested = data.get(key)
+                break
+        contracts = nested if isinstance(nested, list) else [data]
+    if not isinstance(contracts, list):
         return str(data)
-    lines = [f"=== Option Contracts ({len(data)} results) ==="]
-    for item in data:
+
+    # Defensive filter: drop junk records with no real instrument_id so a
+    # backend-returned all-null record is never shown as a contract (API-1957).
+    contracts = [
+        item for item in contracts
+        if not isinstance(item, dict) or item.get("instrument_id")
+    ]
+    if not contracts:
+        return "No option contracts found."
+
+    lines = [f"=== Option Contracts ({len(contracts)} results) ==="]
+    for item in contracts:
+        if not isinstance(item, dict):
+            lines.append(f"  {item}")
+            continue
         lines.append(
             f"  Symbol: {item.get('symbol', 'N/A')}  "
+            f"Instrument ID: {item.get('instrument_id', 'N/A')}  "
             f"Underlying: {item.get('underlying_symbol', 'N/A')}  "
-            f"Type: {item.get('option_type', 'N/A')}  "
-            f"Strike: {item.get('strike_price', 'N/A')}  "
+            f"Type: {item.get('option_type', 'N/A')}"
+        )
+        lines.append(
+            f"    Strike: {item.get('strike_price', 'N/A')}  "
             f"Expiration: {item.get('init_exp_date', item.get('expiration_date', 'N/A'))}  "
             f"Style: {item.get('style', 'N/A')}  "
-            f"Status: {item.get('status', 'N/A')}"
+            f"Status: {item.get('status', 'N/A')}  "
+            f"Tradable Status: {item.get('tradable_status', 'N/A')}"
         )
+        for field in (
+            "root_symbol", "underlying_instrument_id", "underlying_type",
+            "multiplier", "settlement_method", "expired_cycle", "ppind",
+            "currency", "def_type", "listed_exchanges",
+        ):
+            if field in item:
+                lines.append(f"    {field.replace('_', ' ').title()}: {item[field]}")
+        deliverables = item.get("deliverables") or []
+        if isinstance(deliverables, list) and deliverables:
+            lines.append("    Deliverables:")
+            for deliverable in deliverables:
+                lines.append(f"      {deliverable}")
+    if pagination_key:
+        lines.append(f"\nNext pagination_key: {pagination_key}")
     return "\n".join(lines)

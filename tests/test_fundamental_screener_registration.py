@@ -1,4 +1,4 @@
-"""Tool registration & SDK-wiring tests for the 24 new fundamental/financial/screener tools."""
+"""Tool registration & SDK-wiring tests for the 35 new fundamental/financial/news/screener tools."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from webull_openapi_mcp.tools.market_data.fundamental import (
     register_extended_fundamental_tools,
 )
 from webull_openapi_mcp.tools.market_data.financial import register_financial_tools
+from webull_openapi_mcp.tools.market_data.news import register_news_tools
 from webull_openapi_mcp.tools.market_data.screener import (
     register_screener_tools,
     register_extended_screener_tools,
@@ -31,7 +32,10 @@ def _build_mcp() -> tuple[FastMCP, MagicMock]:
     audit = MagicMock()
     config = _config()
     register_fundamental_tools(mcp, sdk, audit, config)
+    # register_extended_* also registers the US-only insight tools because
+    # config.region_id is "us".
     register_extended_fundamental_tools(mcp, sdk, audit, config)
+    register_news_tools(mcp, sdk, audit, config)
     register_financial_tools(mcp, sdk, audit, config)
     register_screener_tools(mcp, sdk, audit, config)
     register_extended_screener_tools(mcp, sdk, audit, config)
@@ -211,3 +215,146 @@ def test_legacy_tools_available_in_all_regions(region):
     names = _build_server_tools(region)
     missing = [t for t in LEGACY_TOOLS if t not in names]
     assert not missing, f"{region} missing legacy: {missing}"
+
+
+def test_market_sentiment_invokes_sdk_with_us_category():
+    mcp, sdk = _build_mcp()
+    sdk.data.screener.get_fear_and_greed_index.return_value = {
+        "time_zone": "America/New_York",
+        "current": {"date": "2026-10-08", "fear_greed_index": 43, "grade": "Neutral"},
+    }
+    text = _call(mcp, "get_market_sentiment", {})
+    sdk.data.screener.get_fear_and_greed_index.assert_called_once_with(category="US_STOCK")
+    assert "Market Sentiment Index" in text
+    assert "43" in text
+
+
+def test_unusual_activities_invokes_screener_with_filters():
+    mcp, sdk = _build_mcp()
+    sdk.data.screener.get_stock_unusual_activities.return_value = {
+        "data": [{"symbol": "NVDA", "alert_type": "VOLUME_SURGE"}]
+    }
+    text = _call(mcp, "get_stock_unusual_activities",
+                 {"symbol": "NVDA", "count": 5, "extended_hours_required": True})
+    _, kwargs = sdk.data.screener.get_stock_unusual_activities.call_args
+    assert kwargs["symbol"] == "NVDA"
+    assert kwargs["category"] == "US_STOCK"
+    assert kwargs["count"] == 5
+    assert kwargs["extended_hours_required"] is True
+    assert "Stock Unusual Activities" in text
+
+
+def test_search_institutions_invokes_sdk():
+    mcp, sdk = _build_mcp()
+    sdk.data.fundamentals.get_institution_search.return_value = {
+        "data": [{"cik": "0001067983", "name": "Berkshire Hathaway"}]
+    }
+    text = _call(mcp, "get_institution_identifier", {"keyword": "Berkshire", "pagination_key": "k"})
+    sdk.data.fundamentals.get_institution_search.assert_called_once_with(
+        "Berkshire", "k"
+    )
+    assert "Institution Search" in text
+    assert "Berkshire Hathaway" in text
+
+
+def test_institution_holdings_invokes_sdk():
+    mcp, sdk = _build_mcp()
+    sdk.data.fundamentals.get_institution_holdings.return_value = {
+        "data": [{"stock": "AAPL", "quantity": "49665910"}],
+    }
+    text = _call(mcp, "get_institution_holdings", {"cik": "1067983"})
+    sdk.data.fundamentals.get_institution_holdings.assert_called_once_with("1067983", None)
+    assert "Institution 13F Holdings" in text
+    assert "AAPL" in text
+
+
+def test_institution_holding_changes_invokes_sdk():
+    mcp, sdk = _build_mcp()
+    sdk.data.fundamentals.get_institution_holding_changes.return_value = {
+        "data": [{"target_symbol": "AAPL"}],
+    }
+    text = _call(mcp, "get_institution_holding_changes", {"cik": "1067983", "position": "open"})
+    sdk.data.fundamentals.get_institution_holding_changes.assert_called_once_with(
+        "1067983", "OPEN", pagination_key=None
+    )
+    assert "Institution Holding Changes" in text
+
+
+def test_insider_transactions_invokes_sdk():
+    mcp, sdk = _build_mcp()
+    sdk.data.fundamentals.get_insider_transactions.return_value = {
+        "data": [{"side": "BUY", "insider_name": "Gawel Scott"}],
+    }
+    text = _call(mcp, "get_insider_transactions", {"symbol": "NVDA", "side": "sell"})
+    _, kwargs = sdk.data.fundamentals.get_insider_transactions.call_args
+    assert kwargs["side"] == "SELL"
+    assert kwargs["category"] == "US_STOCK"
+    assert "Insider Transactions" in text
+
+
+def test_insider_holdings_overview_invokes_sdk():
+    mcp, sdk = _build_mcp()
+    sdk.data.fundamentals.get_insider_holdings.return_value = {
+        "symbol": "NVDA", "insiders_count": 20, "ownership_pct": "3.9665",
+        "changes": [{"period": "1M", "shares": "1000"}],
+    }
+    text = _call(mcp, "get_insider_holdings", {"symbol": "NVDA", "compare_months": 3})
+    _, kwargs = sdk.data.fundamentals.get_insider_holdings.call_args
+    assert kwargs["category"] == "US_STOCK"
+    assert kwargs["compare_months"] == 3
+    assert "Insider Holdings Overview" in text
+    # The 'changes' list must not be silently dropped (see format fix).
+    assert "changes" in text
+
+
+def test_economic_calendar_invokes_sdk_with_us_region():
+    mcp, sdk = _build_mcp()
+    sdk.data.fundamentals.get_economic_calendars.return_value = {
+        "data": [{"event_name": "Unemployment Claimant", "publish_date": "2026-10-16"}],
+    }
+    text = _call(mcp, "get_macroeconomic_calendar", {"start_date": "2026-10-09"})
+    _, kwargs = sdk.data.fundamentals.get_economic_calendars.call_args
+    assert kwargs["region"] == "US"
+    assert kwargs["start_date"] == "2026-10-09"
+    assert "US Economic Calendar" in text
+
+
+def test_search_news_invokes_sdk():
+    mcp, sdk = _build_mcp()
+    sdk.data.news.get_news_search.return_value = {
+        "keyword": "Starlink",
+        "pagination_key": "1791348877000",
+        "data": [{"news_id": "15716519902127104", "title": "Musk calls spectrum deal"}],
+    }
+    text = _call(mcp, "search_news", {"keyword": "Starlink"})
+    sdk.data.news.get_news_search.assert_called_once_with("Starlink", None, None, None)
+    assert "News Keyword Search" in text
+    assert "Musk calls spectrum deal" in text
+
+
+def test_news_detail_invokes_sdk():
+    mcp, sdk = _build_mcp()
+    sdk.data.news.get_news_detail.return_value = {
+        "news_id": "15716519902127104",
+        "title": "Musk calls spectrum deal",
+        "content": "<p>full article body</p>",
+    }
+    text = _call(mcp, "get_news_detail", {"news_id": "15716519902127104"})
+    sdk.data.news.get_news_detail.assert_called_once_with("15716519902127104")
+    assert "News Detail" in text
+    assert "full article body" in text
+
+
+def test_stock_news_invokes_sdk_with_us_category():
+    mcp, sdk = _build_mcp()
+    sdk.data.news.get_stock_news.return_value = {
+        "symbol": "TSLA",
+        "pagination_key": "1791348877000",
+        "data": [{"news_id": "15716519902127104", "title": "some title"}],
+    }
+    text = _call(mcp, "get_stock_news", {"symbol": "TSLA", "sentiment": "positive"})
+    args, kwargs = sdk.data.news.get_stock_news.call_args
+    assert args == ("TSLA",)
+    assert kwargs["category"] == "US_STOCK"
+    assert kwargs["sentiment"] == "POSITIVE"
+    assert "Stock News List" in text

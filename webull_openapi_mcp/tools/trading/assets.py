@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from webull_openapi_mcp.errors import handle_sdk_exception
+from webull_openapi_mcp.errors import ValidationError, handle_sdk_exception
+from webull_openapi_mcp.guards import validate_pagination_key
 from webull_openapi_mcp.formatters import (
     extract_response_data,
     format_account_balance,
@@ -56,9 +57,8 @@ def register_assets_tools(
 
     @mcp.tool(
         description=(
-            "Get account positions. "
-            "Returns: symbol, quantity, side, avg_cost, last_price, "
-            "market_value, unrealized_pnl, realized_pnl."
+            "Get account positions, including option strategy legs when present. "
+            "Returns position identifiers, symbols, quantities, prices, P&L, and option legs."
         ),
         annotations={"readOnlyHint": True},
     )
@@ -87,24 +87,24 @@ def register_assets_tools(
         async def get_account_position_details(
             account_id: str,
             instrument_id: str,
-            page_size: int | None = None,
-            last_id: str | None = None,
+            pagination_key: str | None = None,
         ) -> str:
-            """Get JP account position details for a specific instrument."""
+            """Get JP account position details using the list_position_details cursor endpoint."""
             try:
                 account_id = normalize_account_id(account_id)
-            except ValueError as e:
-                return f"Validation error: {e}"
+                validate_pagination_key(pagination_key)
+            except (ValueError, ValidationError) as e:
+                message = e.message if isinstance(e, ValidationError) else str(e)
+                return f"Validation error: {message}"
             audit.log_tool_call(
                 "get_account_position_details",
                 {"account_id": account_id, "instrument_id": instrument_id},
             )
             try:
-                response = sdk.trade.account_v2.get_account_position_details(
+                response = sdk.trade.account_v2.list_position_details(
                     account_id=account_id,
                     instrument_id=instrument_id,
-                    page_size=page_size,
-                    last_id=last_id,
+                    pagination_key=pagination_key,
                 )
                 data = extract_response_data(response)
                 return prepend_disclaimer(format_position_details(data))

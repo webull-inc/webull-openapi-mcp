@@ -9,6 +9,8 @@ from webull_openapi_mcp.formatters import (
     format_high_dividend,
     format_market_sectors,
     format_market_sectors_detail,
+    format_market_sentiment,
+    format_stock_unusual_activities,
 )
 
 
@@ -203,3 +205,35 @@ class TestFormatFiftyTwoWeek:
 
     def test_empty_data_list(self):
         assert format_fifty_two_week({"has_more": False, "data": []}) == _NO_DATA
+
+
+# ---------------------------------------------------------------------------
+# US market insight formatters
+# ---------------------------------------------------------------------------
+
+class TestFormatMarketSentiment:
+    def test_formats_sentiment_points(self):
+        data = {
+            "time_zone": "America/New_York",
+            "current": {"date": "2026-10-08", "fear_greed_index": 43, "grade": "Neutral"},
+            "previous_day": {"date": "2026-10-07", "fear_greed_index": 55, "grade": "Neutral"},
+        }
+        result = format_market_sentiment(data)
+        assert "=== Market Sentiment Index (America/New_York) ===" in result
+        assert "Current" in result
+        assert "43" in result
+        assert "55" in result
+        assert "Neutral" in result
+
+
+class TestFormatStockUnusualActivities:
+    def test_formats_list_with_pagination(self):
+        data = {
+            "next_pagination_key": "93f2c01a6c532f80ea",
+            "data": [{"symbol": "NVDA", "alert_type": "VOLUME_SURGE"}],
+        }
+        result = format_stock_unusual_activities(data)
+        assert "=== Stock Unusual Activities ===" in result
+        assert "NVDA" in result
+        assert "VOLUME_SURGE" in result
+        assert "Next pagination_key: 93f2c01a6c532f80ea" in result

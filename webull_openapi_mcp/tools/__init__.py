@@ -27,6 +27,8 @@ from webull_openapi_mcp.tools.market_data.watchlist import register_watchlist_to
 from webull_openapi_mcp.tools.market_data.fundamental import register_fundamental_tools
 from webull_openapi_mcp.tools.market_data.fundamental import register_extended_fundamental_tools
 from webull_openapi_mcp.tools.market_data.financial import register_financial_tools
+from webull_openapi_mcp.tools.market_data.community import register_community_tools
+from webull_openapi_mcp.tools.market_data.news import register_news_tools
 
 __all__ = [
     "register_account_tools",
@@ -52,4 +54,6 @@ __all__ = [
     "register_fundamental_tools",
     "register_extended_fundamental_tools",
     "register_financial_tools",
+    "register_community_tools",
+    "register_news_tools",
 ]

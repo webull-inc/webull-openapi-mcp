@@ -104,6 +104,9 @@ def _register_tools(
         # Fundamental data (company profile, analyst ratings) — all regions
         register_fundamental_tools(mcp, sdk, audit, config)
         # Stock & fund fundamentals + financial statements — US / HK / JP only
+        # register_extended_fundamental_tools also registers US-only insight
+        # fundamentals (institutions, 13F, insider, economic calendar) when the
+        # region is US.
         if region_config.supports_fundamentals:
             register_extended_fundamental_tools(mcp, sdk, audit, config)
             register_financial_tools(mcp, sdk, audit, config)
@@ -112,11 +115,18 @@ def _register_tools(
     if _is_toolset_enabled(config, "market-data"):
         register_stock_market_data_tools(mcp, sdk, audit, config)
 
+        # News insight tools (news search, detail, stock news) — US market only
+        if region_config.region_id == "us":
+            from webull_openapi_mcp.tools import register_news_tools
+            register_news_tools(mcp, sdk, audit, config)
+
         # Screener tools (gainers/losers, most active)
         from webull_openapi_mcp.tools import register_screener_tools
         register_screener_tools(mcp, sdk, audit, config)
 
-        # Extended screener (market sectors, high dividend, 52-week high/low) — US / HK / JP only
+        # Extended screener (market sectors, high dividend, 52-week high/low) — US / HK / JP only.
+        # Also registers US-only insight screeners (sentiment index, unusual
+        # activities) when the region is US.
         if region_config.supports_fundamentals:
             from webull_openapi_mcp.tools import register_extended_screener_tools
             register_extended_screener_tools(mcp, sdk, audit, config)
@@ -124,6 +134,11 @@ def _register_tools(
         # Watchlist tools
         from webull_openapi_mcp.tools import register_watchlist_tools
         register_watchlist_tools(mcp, sdk, audit, config)
+
+        # Community tools (posts, comments, hot stocks) — US only
+        if region_config.region_id == "us":
+            from webull_openapi_mcp.tools import register_community_tools
+            register_community_tools(mcp, sdk, audit, config)
 
         if region_config.supports_futures:
             from webull_openapi_mcp.tools import register_futures_market_data_tools
@@ -137,7 +152,7 @@ def _register_tools(
             from webull_openapi_mcp.tools import register_event_market_data_tools
             register_event_market_data_tools(mcp, sdk, audit, config)
 
-        if region_config.region_id in ("us", "hk", "jp"):
+        if region_config.supports_options:
             from webull_openapi_mcp.tools import register_option_market_data_tools
             register_option_market_data_tools(mcp, sdk, audit, config)
 
