@@ -61,8 +61,6 @@ def register_community_tools(
                 Must be provided together with symbol.
         """
         audit.log_tool_call("create_community_post", {"symbol": symbol, "category": category})
-        # symbol 与 category 必须成对提供；用真值判断使空串与 None 都视为未提供，
-        # 并把空串归一化为 None，避免把空值发给 SDK。
         symbol = symbol or None
         category = category or None
         if (symbol is None) != (category is None):
