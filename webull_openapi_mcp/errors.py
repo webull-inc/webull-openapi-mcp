@@ -94,9 +94,6 @@ MARKET_DATA_TOOLS = frozenset({
     "get_event_snapshot",
     "get_event_depth",
     "get_event_bars",
-    "get_option_tick",
-    "get_option_snapshot",
-    "get_option_bars",
     "get_market_sentiment",
     "get_stock_unusual_activities",
     "get_institution_identifier",
@@ -108,6 +105,9 @@ MARKET_DATA_TOOLS = frozenset({
     "search_news",
     "get_news_detail",
     "get_stock_news",
+    "get_option_tick",
+    "get_option_snapshot",
+    "get_option_bars",
 })
 
 # Region-specific subscription guidance

@@ -920,6 +920,15 @@ def format_order_executions(data: Any) -> str:
 # Instrument formatters
 # ---------------------------------------------------------------------------
 
+def _next_page_line(data: Any) -> list[str]:
+    """Return the next-page hint line when the response carries a pagination_key."""
+    if isinstance(data, dict):
+        pagination_key = data.get("pagination_key") or data.get("next_pagination_key")
+        if pagination_key:
+            return [f"\nNext pagination_key: {pagination_key}"]
+    return []
+
+
 def _format_flat_item(item: dict, indent: str = "  ") -> list[str]:
     """Format a single dict item as flat key-value lines."""
     lines: list[str] = []
@@ -931,12 +940,21 @@ def _format_flat_item(item: dict, indent: str = "  ") -> list[str]:
 
 
 def _format_flat_list(data: Any, title: str) -> str:
-    """Format a list of dicts as flat key-value output."""
+    """Format a list of dicts as flat key-value output.
+
+    Cursor-paginated responses ``{data: [...], pagination_key: "..."}`` are
+    unwrapped and the next-page cursor is appended after the items.
+    """
     if not data:
         return _NO_DATA
+    next_page: list[str] = []
     if isinstance(data, dict):
-        data = [data]
-    if not isinstance(data, list):
+        if isinstance(data.get("data"), list):
+            next_page = _next_page_line(data)
+            data = data["data"]
+        else:
+            data = [data]
+    if not isinstance(data, list) or not data:
         return _NO_DATA
     lines: list[str] = [f"=== {title} ==="]
     for i, item in enumerate(data):
@@ -945,6 +963,7 @@ def _format_flat_list(data: Any, title: str) -> str:
         if i > 0:
             lines.append("")
         lines.extend(_format_flat_item(item))
+    lines.extend(next_page)
     return "\n".join(lines)
 
 
@@ -1367,8 +1386,8 @@ def _format_screener_item(item: dict) -> str:
 def format_gainers_losers(data: Any) -> str:
     """Format gainers/losers screener response.
 
-    API returns: {hasMore: bool, data: [{instrumentId, symbol, name, price,
-    change, changePercent, volume, marketValue, ...}]}
+    API returns a bare list (no pagination): [{instrument_id, symbol, name, price,
+    change, change_ratio, volume, market_value, ...}]
     """
     if not data:
         return _NO_DATA
@@ -1382,9 +1401,6 @@ def format_gainers_losers(data: Any) -> str:
         if isinstance(item, dict):
             lines.append(_format_screener_item(item))
 
-    has_more = data.get("has_more") if isinstance(data, dict) else None
-    if has_more is True:
-        lines.append("\n  (More results available — increase page_size or page_index)")
 
     return "\n".join(lines)
 
@@ -1392,8 +1408,8 @@ def format_gainers_losers(data: Any) -> str:
 def format_most_active(data: Any) -> str:
     """Format most active screener response.
 
-    API returns: {hasMore: bool, data: [{instrumentId, symbol, name, price,
-    change, changePercent, volume, marketValue, relativeVolume10d, ...}]}
+    API returns a bare list (no pagination): [{instrument_id, symbol, name, price,
+    change, change_ratio, volume, market_value, relative_volume_10d, ...}]
     """
     if not data:
         return _NO_DATA
@@ -1409,9 +1425,6 @@ def format_most_active(data: Any) -> str:
             extra = f"\n    Relative Volume 10d: {rel_vol}" if rel_vol != "N/A" else ""
             lines.append(_format_screener_item(item) + extra)
 
-    has_more = data.get("has_more") if isinstance(data, dict) else None
-    if has_more is True:
-        lines.append("\n  (More results available — increase page_size or page_index)")
 
     return "\n".join(lines)
 
@@ -1955,12 +1968,14 @@ def format_fund_brief(data: Any) -> str:
 def format_fund_dividends(data: Any) -> str:
     """Format fund dividends response.
 
-    API returns list: [{share_date, publish_date, pay_date, record_date, dps}]
+    API returns {data: [{share_date, publish_date, pay_date, record_date, dps}],
+    pagination_key: str}; pagination_key is absent on the last page.
     """
     if not data:
         return _NO_DATA
+    next_page = _next_page_line(data)
     if isinstance(data, dict):
-        data = [data]
+        data = data["data"] if isinstance(data.get("data"), list) else [data]
     if not isinstance(data, list):
         return _NO_DATA
 
@@ -1973,6 +1988,7 @@ def format_fund_dividends(data: Any) -> str:
             f"Pay: {_get(item, 'pay_date')}  Record: {_get(item, 'record_date')}  "
             f"Publish: {_get(item, 'publish_date')}"
         )
+    lines.extend(next_page)
     return "\n".join(lines)
 
 
@@ -2200,11 +2216,12 @@ def format_cash_flow(data: Any) -> str:
 def format_market_sectors(data: Any) -> str:
     """Format market sectors response.
 
-    API returns list: [{id, name, change_ratio, volume, market_value, declined,
-    advanced, flat, data: [{instrument_id, name, symbol}]}]
+    API returns {data: [{id, name, change_ratio, volume, market_value, declined,
+    advanced, flat, data: [{instrument_id, name, symbol}]}], pagination_key: str}
     """
     if not data:
         return _NO_DATA
+    next_page = _next_page_line(data)
     if isinstance(data, dict):
         data = data.get("data", data) if "data" in data else [data]
     if not isinstance(data, list) or not data:
@@ -2231,6 +2248,7 @@ def format_market_sectors(data: Any) -> str:
                 f"      {_get(stock, 'symbol'):>10s}  {_get(stock, 'name'):<24s}  "
                 f"(instrument_id: {_get(stock, 'instrument_id')})"
             )
+    lines.extend(next_page)
     return "\n".join(lines)
 
 
@@ -2251,7 +2269,8 @@ def format_market_sectors_detail(data: Any) -> str:
 
     API returns: {id, name, change_ratio, declined, advanced, flat,
     data: [{instrument_id, category, currency, name, symbol, exchange_code, close,
-    change_ratio, price, volume, market_value, turnover_rate, amplitude, high, low}]}
+    change_ratio, price, volume, market_value, turnover_rate, amplitude, high, low}],
+    pagination_key: str}
     """
     if not data:
         return _NO_DATA
@@ -2269,16 +2288,17 @@ def format_market_sectors_detail(data: Any) -> str:
     for stock in stocks:
         if isinstance(stock, dict):
             lines.extend(_format_sector_detail_stock(stock))
+    lines.extend(_next_page_line(data))
     return "\n".join(lines)
 
 
 def format_high_dividend(data: Any) -> str:
     """Format high dividend screener response.
 
-    API returns: {has_more, data: [{instrument_id, category, currency, name, symbol,
-    ticker_symbol, exchange_code, close, change, change_ratio, price, volume,
+    API returns a bare list (no pagination): [{instrument_id, category, currency, name,
+    symbol, ticker_symbol, exchange_code, close, change, change_ratio, price, volume,
     market_value, turnover_rate, amplitude, high, low, turnover, yield, dividend,
-    ex_date, pe_ttm}]}
+    ex_date, pe_ttm}]
     """
     if not data:
         return _NO_DATA
@@ -2304,9 +2324,6 @@ def format_high_dividend(data: Any) -> str:
             f"Volume: {_get(item, 'volume')}  Market Value: {_get(item, 'market_value')}"
         )
 
-    has_more = data.get("has_more") if isinstance(data, dict) else None
-    if has_more is True:
-        lines.append("\n  (More results available — increase page_size or page_index)")
 
     return "\n".join(lines)
 
@@ -2314,10 +2331,10 @@ def format_high_dividend(data: Any) -> str:
 def format_fifty_two_week(data: Any) -> str:
     """Format 52-week high/low screener response.
 
-    API returns: {has_more, data: [{instrument_id, category, currency, name, symbol,
-    ticker_symbol, exchange_code, close, change, change_ratio, price, volume,
+    API returns a bare list (no pagination): [{instrument_id, category, currency, name,
+    symbol, ticker_symbol, exchange_code, close, change, change_ratio, price, volume,
     market_value, turnover_rate, high, low, turnover, amplitude, price_1w, price_52w,
-    change_ratio_52w, pe_ttm}]}
+    change_ratio_52w, pe_ttm}]
     """
     if not data:
         return _NO_DATA
@@ -2343,9 +2360,6 @@ def format_fifty_two_week(data: Any) -> str:
             f"High: {_get(item, 'high')}  Low: {_get(item, 'low')}  PE(TTM): {_get(item, 'pe_ttm')}"
         )
 
-    has_more = data.get("has_more") if isinstance(data, dict) else None
-    if has_more is True:
-        lines.append("\n  (More results available — increase page_size or page_index)")
 
     return "\n".join(lines)
 

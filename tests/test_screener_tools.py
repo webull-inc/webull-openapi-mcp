@@ -77,6 +77,13 @@ class TestFormatMarketSectors:
     def test_empty_data_key(self):
         assert format_market_sectors({"data": []}) == _NO_DATA
 
+    def test_shows_next_pagination_key(self):
+        data = {
+            "data": [{"id": "1", "name": "Energy", "change_ratio": "0.02"}],
+            "pagination_key": "abc123",
+        }
+        assert "Next pagination_key: abc123" in format_market_sectors(data)
+
 
 # ---------------------------------------------------------------------------
 # Market Sectors Detail
@@ -131,39 +138,32 @@ class TestFormatMarketSectorsDetail:
 
 class TestFormatHighDividend:
     def test_formats_data(self):
-        data = {
-            "has_more": True,
-            "data": [
-                {
-                    "instrument_id": "913256",
-                    "symbol": "T",
-                    "name": "AT&T Inc",
-                    "price": "20.00",
-                    "change_ratio": "0.01",
-                    "volume": "30000000",
-                    "market_value": "150000000000",
-                    "yield": "0.06",
-                    "dividend": "1.11",
-                    "ex_date": "2026-01-09",
-                    "pe_ttm": "8.5",
-                },
-            ],
-        }
+        data = [
+            {
+                "instrument_id": "913256",
+                "symbol": "T",
+                "name": "AT&T Inc",
+                "price": "20.00",
+                "change_ratio": "0.01",
+                "volume": "30000000",
+                "market_value": "150000000000",
+                "yield": "0.06",
+                "dividend": "1.11",
+                "ex_date": "2026-01-09",
+                "pe_ttm": "8.5",
+            },
+        ]
         result = format_high_dividend(data)
         assert "High Dividend" in result
         assert "AT&T Inc" in result
         assert "0.06" in result
         assert "1.11" in result
         assert "2026-01-09" in result
-        assert "More results available" in result
-
-    def test_no_has_more(self):
-        data = {"has_more": False, "data": [{"symbol": "T", "name": "AT&T", "yield": "0.06"}]}
-        result = format_high_dividend(data)
         assert "More results available" not in result
 
+
     def test_empty_data_list(self):
-        assert format_high_dividend({"has_more": False, "data": []}) == _NO_DATA
+        assert format_high_dividend([]) == _NO_DATA
 
 
 # ---------------------------------------------------------------------------
@@ -172,24 +172,21 @@ class TestFormatHighDividend:
 
 class TestFormatFiftyTwoWeek:
     def test_formats_data(self):
-        data = {
-            "has_more": False,
-            "data": [
-                {
-                    "instrument_id": "913256135",
-                    "symbol": "AAPL",
-                    "name": "Apple Inc",
-                    "price": "300.00",
-                    "change_ratio": "0.02",
-                    "change_ratio_52w": "0.55",
-                    "price_1w": "290.00",
-                    "price_52w": "200.00",
-                    "high": "305.00",
-                    "low": "295.00",
-                    "pe_ttm": "30.0",
-                },
-            ],
-        }
+        data = [
+            {
+                "instrument_id": "913256135",
+                "symbol": "AAPL",
+                "name": "Apple Inc",
+                "price": "300.00",
+                "change_ratio": "0.02",
+                "change_ratio_52w": "0.55",
+                "price_1w": "290.00",
+                "price_52w": "200.00",
+                "high": "305.00",
+                "low": "295.00",
+                "pe_ttm": "30.0",
+            },
+        ]
         result = format_fifty_two_week(data)
         assert "52-Week High/Low" in result
         assert "AAPL" in result
@@ -198,13 +195,9 @@ class TestFormatFiftyTwoWeek:
         assert "200.00" in result
         assert "30.0" in result
 
-    def test_has_more_flag(self):
-        data = {"has_more": True, "data": [{"symbol": "AAPL", "name": "Apple", "price": "300"}]}
-        result = format_fifty_two_week(data)
-        assert "More results available" in result
 
     def test_empty_data_list(self):
-        assert format_fifty_two_week({"has_more": False, "data": []}) == _NO_DATA
+        assert format_fifty_two_week([]) == _NO_DATA
 
 
 # ---------------------------------------------------------------------------

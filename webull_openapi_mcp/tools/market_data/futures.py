@@ -153,6 +153,7 @@ def register_futures_market_data_tools(
         description=(
             "Get futures OHLCV bars in batch. "
             f"{_category_note} "
+            "start_time/end_time: optional range as timestamps in milliseconds. "
             "Returns: time, open, high, low, close, volume."
         ),
         annotations={"readOnlyHint": True},
@@ -163,8 +164,15 @@ def register_futures_market_data_tools(
         timespan: str = "D",
         count: int = 200,
         real_time_required: bool = False,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
     ) -> str:
-        """Batch fetch historical OHLCV bar data for multiple futures symbols."""
+        """Batch fetch historical OHLCV bar data for multiple futures symbols.
+
+        Args:
+            start_time: Start timestamp in milliseconds (optional).
+            end_time: End timestamp in milliseconds (optional).
+        """
         audit.log_tool_call("get_futures_bars", {"symbols": symbols})
         err = _validate_category(category)
         if err:
@@ -175,6 +183,8 @@ def register_futures_market_data_tools(
                 {"symbols": sym_list, "category": category, "timespan": timespan},
                 count=str(count) if count != 200 else None,
                 real_time_required=real_time_required,
+                start_time=start_time,
+                end_time=end_time,
             )
             data = extract_response_data(sdk.data.futures_market_data.get_futures_history_bars(**kwargs))
             return prepend_disclaimer(format_futures_bars(data))

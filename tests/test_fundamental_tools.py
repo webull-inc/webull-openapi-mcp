@@ -368,6 +368,12 @@ class TestFormatFundDividends:
         assert "0.5" in result
         assert "2026-01-15" in result
 
+    def test_unwraps_paginated_response(self):
+        data = {"data": [{"dps": "0.7", "pay_date": "2026-02-15"}], "pagination_key": "k1"}
+        result = format_fund_dividends(data)
+        assert "0.7" in result
+        assert "Next pagination_key: k1" in result
+
 
 class TestFormatFundSplits:
     def test_formats_data(self):

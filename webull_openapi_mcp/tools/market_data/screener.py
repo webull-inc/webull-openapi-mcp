@@ -55,8 +55,6 @@ def register_screener_tools(
         category: str = "US_STOCK",
         sort_by: str = "CHANGE_RATIO",
         direction: str = "DESC",
-        page_index: Optional[int] = None,
-        page_size: Optional[int] = None,
     ) -> str:
         """Get stock top gainers or losers ranking.
 
@@ -66,18 +64,14 @@ def register_screener_tools(
             sort_by: Secondary sort field. Values: CHANGE_RATIO, RELATIVE_VOLUME_10D,
                 MARKET_VALUE, CLOSE, PRICE, PE_TTM, HIGH, LOW, AMPLITUDE, TURNOVER, VOLUME.
             direction: DESC for gainers (default), ASC for losers.
-            page_index: Page number starting from 1.
-            page_size: Records per page (default 20).
         """
         audit.log_tool_call("get_gainers_losers", {"rank_type": rank_type, "direction": direction})
         try:
             data = extract_response_data(
-                sdk.data.screener.get_gainers_losers(
+                sdk.data.screener.list_gainers_losers(
                     rank_type=rank_type,
                     category=category,
                     sort_by=sort_by,
-                    page_index=page_index,
-                    page_size=page_size,
                     direction=direction,
                 )
             )
@@ -99,8 +93,6 @@ def register_screener_tools(
         rank_type: Optional[str] = None,
         sort_by: Optional[str] = None,
         direction: Optional[str] = None,
-        page_index: Optional[int] = None,
-        page_size: Optional[int] = None,
     ) -> str:
         """Get most actively traded stocks ranking.
 
@@ -110,18 +102,14 @@ def register_screener_tools(
             sort_by: Secondary sort field. Values: CHANGE_RATIO, RELATIVE_VOLUME_10D,
                 MARKET_VALUE, CLOSE, PRICE, PE_TTM, HIGH, LOW, AMPLITUDE, TURNOVER, VOLUME.
             direction: ASC or DESC (default DESC).
-            page_index: Page number starting from 1.
-            page_size: Records per page (default 20).
         """
         audit.log_tool_call("get_most_active", {"category": category, "rank_type": rank_type})
         try:
             data = extract_response_data(
-                sdk.data.screener.get_most_active(
+                sdk.data.screener.list_most_active(
                     category=category,
                     rank_type=rank_type,
                     sort_by=sort_by,
-                    page_index=page_index,
-                    page_size=page_size,
                     direction=direction,
                 )
             )
@@ -150,7 +138,7 @@ def register_extended_screener_tools(
             "Get market sector overview ranking. "
             "Returns per sector: id, name, change_ratio, volume, market_value, "
             "advanced, declined, flat, and a short list of leading stocks "
-            "(symbol, name, instrument_id)."
+            "(symbol, name, instrument_id). Pass pagination_key from the previous response for the next page."
         ),
         annotations={"readOnlyHint": True},
     )
@@ -158,9 +146,8 @@ def register_extended_screener_tools(
         category: str = "US_STOCK",
         agg_type: Optional[str] = None,
         period: Optional[str] = None,
-        page_index: Optional[int] = None,
-        page_size: Optional[int] = None,
         direction: Optional[str] = None,
+        pagination_key: Optional[str] = None,
     ) -> str:
         """Get market sector overview ranking.
 
@@ -168,20 +155,19 @@ def register_extended_screener_tools(
             category: Security market category (e.g. US_STOCK).
             agg_type: Aggregation metric. MARKET_VALUE (default) or VOLUME.
             period: Time period. D1 (default), D5, M01, M03.
-            page_index: Page number starting from 1.
-            page_size: Records per page.
             direction: Sort direction. ASC or DESC.
+            pagination_key: Pagination key from the previous page response;
+                not returned on the last page.
         """
         audit.log_tool_call("get_market_sectors", {"category": category})
         try:
             data = extract_response_data(
-                sdk.data.screener.get_market_sectors(
+                sdk.data.screener.list_market_sectors(
                     category=category,
                     agg_type=agg_type,
                     period=period,
-                    page_index=page_index,
-                    page_size=page_size,
                     direction=direction,
+                    pagination_key=pagination_key,
                 )
             )
             return prepend_disclaimer(format_market_sectors(data))
@@ -193,7 +179,8 @@ def register_extended_screener_tools(
             "Get the stock list and statistics for a specific market sector. "
             "Returns: sector id, name, change_ratio, advanced/declined/flat counts, "
             "and a list of stocks with symbol, name, price, close, change_ratio, "
-            "volume, market_value, turnover_rate, amplitude, high, low."
+            "volume, market_value, turnover_rate, amplitude, high, low. "
+            "Pass pagination_key from the previous response for the next page."
         ),
         annotations={"readOnlyHint": True},
     )
@@ -201,10 +188,9 @@ def register_extended_screener_tools(
         sector_id: str,
         category: str = "US_STOCK",
         period: Optional[str] = None,
-        page_index: Optional[int] = None,
-        page_size: Optional[int] = None,
         sort_by: Optional[str] = None,
         direction: Optional[str] = None,
+        pagination_key: Optional[str] = None,
     ) -> str:
         """Get stock list and statistics for a sector.
 
@@ -212,24 +198,23 @@ def register_extended_screener_tools(
             sector_id: Sector identifier (from get_market_sectors).
             category: Security market category (e.g. US_STOCK).
             period: Time period. D1 (default), D5, M01, M03.
-            page_index: Page number starting from 1.
-            page_size: Records per page.
             sort_by: Sort field. Default CHANGE_RATIO. Options include CHANGE_RATIO,
                 RELATIVE_VOLUME_10D, MARKET_VALUE, CLOSE, PRICE, PE_TTM, HIGH, LOW,
                 AMPLITUDE, TURNOVER, VOLUME, YIELD, DIVIDEND.
             direction: Sort direction. ASC or DESC.
+            pagination_key: Pagination key from the previous page response;
+                not returned on the last page.
         """
         audit.log_tool_call("get_market_sectors_detail", {"sector_id": sector_id})
         try:
             data = extract_response_data(
-                sdk.data.screener.get_market_sectors_detail(
+                sdk.data.screener.list_market_sectors_detail(
                     sector_id=sector_id,
                     category=category,
                     period=period,
-                    page_index=page_index,
-                    page_size=page_size,
                     sort_by=sort_by,
                     direction=direction,
+                    pagination_key=pagination_key,
                 )
             )
             return prepend_disclaimer(format_market_sectors_detail(data))
@@ -247,8 +232,6 @@ def register_extended_screener_tools(
     async def get_high_dividend(
         category: str = "US_STOCK",
         sort_by: Optional[str] = None,
-        page_index: Optional[int] = None,
-        page_size: Optional[int] = None,
         direction: Optional[str] = None,
     ) -> str:
         """Get high dividend stocks ranking.
@@ -258,18 +241,14 @@ def register_extended_screener_tools(
             sort_by: Sort field. Default YIELD. Options include CHANGE_RATIO,
                 RELATIVE_VOLUME_10D, MARKET_VALUE, CLOSE, PRICE, PE_TTM, HIGH, LOW,
                 AMPLITUDE, TURNOVER, VOLUME, YIELD, DIVIDEND.
-            page_index: Page number starting from 1.
-            page_size: Records per page.
             direction: Sort direction. ASC or DESC.
         """
         audit.log_tool_call("get_high_dividend", {"category": category})
         try:
             data = extract_response_data(
-                sdk.data.screener.get_high_dividend(
+                sdk.data.screener.list_high_dividend(
                     category=category,
                     sort_by=sort_by,
-                    page_index=page_index,
-                    page_size=page_size,
                     direction=direction,
                 )
             )
@@ -289,8 +268,6 @@ def register_extended_screener_tools(
         category: str = "US_STOCK",
         rank_type: Optional[str] = None,
         sort_by: Optional[str] = None,
-        page_index: Optional[int] = None,
-        page_size: Optional[int] = None,
         direction: Optional[str] = None,
     ) -> str:
         """Get 52-week high/low stocks ranking.
@@ -301,19 +278,15 @@ def register_extended_screener_tools(
             sort_by: Sort field. Default CHANGE_RATIO_52W. Options include CHANGE_RATIO,
                 RELATIVE_VOLUME_10D, MARKET_VALUE, CLOSE, PRICE, PE_TTM, HIGH, LOW,
                 AMPLITUDE, TURNOVER, VOLUME, YIELD, DIVIDEND.
-            page_index: Page number starting from 1.
-            page_size: Records per page.
             direction: Sort direction. ASC or DESC.
         """
         audit.log_tool_call("get_52_week_high_low", {"category": category, "rank_type": rank_type})
         try:
             data = extract_response_data(
-                sdk.data.screener.get_52whl(
+                sdk.data.screener.list_52whl(
                     category=category,
                     rank_type=rank_type,
                     sort_by=sort_by,
-                    page_index=page_index,
-                    page_size=page_size,
                     direction=direction,
                 )
             )

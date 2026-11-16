@@ -152,3 +152,21 @@ class TestFormatAnalystTargetPrice:
     def test_non_dict_returns_no_data(self):
         assert format_analyst_target_price("invalid") == _NO_DATA
         assert format_analyst_target_price([]) == _NO_DATA
+# ---------------------------------------------------------------------------
+# Instrument list pagination
+# ---------------------------------------------------------------------------
+class TestFormatInstrumentsPagination:
+    def test_unwraps_paginated_response(self):
+        from webull_openapi_mcp.formatters import format_instruments
+        data = {
+            "data": [{"symbol": "AAPL", "name": "APPLE INC"}],
+            "pagination_key": "cursor-1",
+        }
+        result = format_instruments(data)
+        assert "AAPL" in result
+        assert "Next pagination_key: cursor-1" in result
+    def test_last_page_has_no_cursor(self):
+        from webull_openapi_mcp.formatters import format_instruments
+        result = format_instruments({"data": [{"symbol": "AAPL"}]})
+        assert "AAPL" in result
+        assert "pagination_key" not in result
