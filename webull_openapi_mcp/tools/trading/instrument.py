@@ -63,11 +63,12 @@ def register_instrument_tools(
         description=(
             "Get stock/ETF instrument info.\n"
             "Two modes: (1) Query by symbols — pass symbols, no pagination needed. "
-            "(2) Query by category — omit symbols, use page_size/last_instrument_id for pagination.\n"
+            "(2) Query by category — omit symbols, use pagination_key for pagination.\n"
             "category: US_STOCK, HK_STOCK, JP_STOCK, CN_STOCK.\n"
             "sub_category: optional sub-classification filter within the category "
             "(e.g. COMMON_STOCK, ETF, PREFERRED_STOCK, WARRANT, UNITS, RIGHT).\n"
             "status: OC (Tradable), CO (Liquidate only), NT (Non-Tradable).\n"
+            "pagination_key: cursor returned by the previous response; absent on the last page.\n"
             "Returns: symbol, name, instrument_type, exchange, sub_category."
         ),
         annotations={"readOnlyHint": True},
@@ -77,8 +78,7 @@ def register_instrument_tools(
         category: str = "US_STOCK",
         sub_category: Optional[str] = None,
         status: Optional[str] = None,
-        page_size: int = 1000,
-        last_instrument_id: Optional[str] = None,
+        pagination_key: Optional[str] = None,
     ) -> str:
         """Get stock/ETF instrument information. Query by symbols or paginate by category."""
         audit.log_tool_call("get_instruments", {"symbols": symbols, "category": category, "sub_category": sub_category})
@@ -90,10 +90,9 @@ def register_instrument_tools(
                 symbols=_split_symbols(symbols) if symbols else None,
                 sub_category=sub_category,
                 status=status,
-                page_size=page_size if page_size != 1000 else None,
-                last_instrument_id=last_instrument_id,
+                pagination_key=pagination_key,
             )
-            data = extract_response_data(sdk.data.instrument.get_instrument(**kwargs))
+            data = extract_response_data(sdk.data.instrument.list_instruments(**kwargs))
             return prepend_disclaimer(format_instruments(data))
         except Exception as e:
             return handle_sdk_exception(e, "get_instruments")
@@ -184,9 +183,10 @@ def register_instrument_tools(
             description=(
                 "Get cryptocurrency instrument info.\n"
                 "Two modes: (1) Query by symbols — pass symbols. "
-                "(2) Query all — omit symbols, use page_size/last_instrument_id for pagination.\n"
+                "(2) Query all — omit symbols, use pagination_key for pagination.\n"
                 "category: US_CRYPTO.\n"
                 "status: OC (Tradable), CO (Liquidate only), NT (Non-Tradable).\n"
+                "pagination_key: cursor returned by the previous response; absent on the last page.\n"
                 "Returns: symbol, name, instrument_type, exchange."
             ),
             annotations={"readOnlyHint": True},
@@ -195,8 +195,7 @@ def register_instrument_tools(
             symbols: Optional[str] = None,
             category: str = "US_CRYPTO",
             status: Optional[str] = None,
-            page_size: int = 1000,
-            last_instrument_id: Optional[str] = None,
+            pagination_key: Optional[str] = None,
         ) -> str:
             """Get cryptocurrency instrument information."""
             audit.log_tool_call("get_crypto_instruments", {"symbols": symbols})
@@ -205,10 +204,9 @@ def register_instrument_tools(
                     {"category": category},
                     symbols=_split_symbols(symbols) if symbols else None,
                     status=status,
-                    page_size=page_size if page_size != 1000 else None,
-                    last_instrument_id=last_instrument_id,
+                    pagination_key=pagination_key,
                 )
-                data = extract_response_data(sdk.data.instrument.get_crypto_instrument(**kwargs))
+                data = extract_response_data(sdk.data.instrument.list_crypto_instruments(**kwargs))
                 return prepend_disclaimer(format_instruments(data))
             except Exception as e:
                 return handle_sdk_exception(e, "get_crypto_instruments")
@@ -219,15 +217,15 @@ def register_instrument_tools(
                 "Get event contract series (recurring event templates).\n"
                 "category: ECONOMICS, FINANCIALS, POLITICS, ENTERTAINMENT, "
                 "SCIENCE_TECHNOLOGY, CLIMATE_WEATHER, TRANSPORTATION, CRYPTO, SPORTS.\n"
-                "Returns: series_id, name, category."
+                "pagination_key: cursor returned by the previous response; absent on the last page.\n"
+                "Returns: series_id, symbol, name, category, frequency."
             ),
             annotations={"readOnlyHint": True},
         )
         async def get_event_series(
             symbols: Optional[str] = None,
             category: Optional[str] = None,
-            page_size: int = 500,
-            last_series_id: Optional[str] = None,
+            pagination_key: Optional[str] = None,
         ) -> str:
             """Get event contract series list."""
             audit.log_tool_call("get_event_series", {})
@@ -236,10 +234,9 @@ def register_instrument_tools(
                     {},
                     category=category,
                     symbols=_split_symbols(symbols) if symbols else None,
-                    page_size=page_size if page_size != 500 else None,
-                    last_series_id=last_series_id,
+                    pagination_key=pagination_key,
                 )
-                data = extract_response_data(sdk.data.instrument.get_event_series(**kwargs))
+                data = extract_response_data(sdk.data.instrument.list_event_series(**kwargs))
                 return prepend_disclaimer(format_event_series(data))
             except Exception as e:
                 return handle_sdk_exception(e, "get_event_series")
@@ -248,6 +245,7 @@ def register_instrument_tools(
             description=(
                 "Get event contract instruments by series.\n"
                 "expiration_date_after: filter items expiring after date (YYYY-MM-DD, default today).\n"
+                "pagination_key: cursor returned by the previous response; absent on the last page.\n"
                 "Returns: symbol, name, instrument_type, exchange."
             ),
             annotations={"readOnlyHint": True},
@@ -257,8 +255,7 @@ def register_instrument_tools(
             event_symbol: Optional[str] = None,
             symbols: Optional[str] = None,
             expiration_date_after: Optional[str] = None,
-            page_size: int = 500,
-            last_instrument_id: Optional[str] = None,
+            pagination_key: Optional[str] = None,
         ) -> str:
             """Get event contract instrument information."""
             audit.log_tool_call("get_event_instruments", {"series_symbol": series_symbol})
@@ -268,10 +265,9 @@ def register_instrument_tools(
                     event_symbol=event_symbol,
                     symbols=_split_symbols(symbols) if symbols else None,
                     expiration_date_after=expiration_date_after,
-                    page_size=page_size if page_size != 500 else None,
-                    last_instrument_id=last_instrument_id,
+                    pagination_key=pagination_key,
                 )
-                data = extract_response_data(sdk.data.instrument.get_event_instrument(**kwargs))
+                data = extract_response_data(sdk.data.instrument.list_event_instruments(**kwargs))
                 return prepend_disclaimer(format_instruments(data))
             except Exception as e:
                 return handle_sdk_exception(e, "get_event_instruments")

@@ -127,35 +127,41 @@ def test_income_statement_passes_type_and_count():
 
 def test_high_dividend_invokes_screener():
     mcp, sdk = _build_mcp()
-    sdk.data.screener.get_high_dividend.return_value = {
-        "has_more": False,
-        "data": [{"symbol": "T", "name": "AT&T", "yield": "0.06"}],
-    }
+    sdk.data.screener.list_high_dividend.return_value = [
+        {"symbol": "T", "name": "AT&T", "yield": "0.06"},
+    ]
     text = _call(mcp, "get_high_dividend", {})
-    sdk.data.screener.get_high_dividend.assert_called_once()
+    sdk.data.screener.list_high_dividend.assert_called_once()
+    _, kwargs = sdk.data.screener.list_high_dividend.call_args
+    assert "page_index" not in kwargs and "page_size" not in kwargs
     assert "High Dividend" in text
 
 
 def test_52_week_high_low_invokes_screener():
     mcp, sdk = _build_mcp()
-    sdk.data.screener.get_52whl.return_value = {
-        "has_more": False,
-        "data": [{"symbol": "AAPL", "name": "Apple", "price": "300"}],
-    }
+    sdk.data.screener.list_52whl.return_value = [
+        {"symbol": "AAPL", "name": "Apple", "price": "300"},
+    ]
     text = _call(mcp, "get_52_week_high_low", {"rank_type": "NEW_HIGH"})
-    sdk.data.screener.get_52whl.assert_called_once()
+    sdk.data.screener.list_52whl.assert_called_once()
     assert "52-Week High/Low" in text
 
 
 def test_market_sectors_detail_requires_sector_id():
     mcp, sdk = _build_mcp()
-    sdk.data.screener.get_market_sectors_detail.return_value = {
+    sdk.data.screener.list_market_sectors_detail.return_value = {
         "id": "1", "name": "Tech", "change_ratio": "0.01", "data": [],
+        "pagination_key": "NEXT123",
     }
-    text = _call(mcp, "get_market_sectors_detail", {"sector_id": "1001"})
-    _, kwargs = sdk.data.screener.get_market_sectors_detail.call_args
+    text = _call(
+        mcp, "get_market_sectors_detail",
+        {"sector_id": "1001", "pagination_key": "PREV456"},
+    )
+    _, kwargs = sdk.data.screener.list_market_sectors_detail.call_args
     assert kwargs["sector_id"] == "1001"
+    assert kwargs["pagination_key"] == "PREV456"
     assert "Market Sector Detail" in text
+    assert "Next pagination_key: NEXT123" in text
 
 
 def test_sdk_exception_is_handled_gracefully():

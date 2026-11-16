@@ -476,30 +476,29 @@ def register_extended_fundamental_tools(
     @mcp.tool(
         description=(
             "Get fund dividend history (paginated). "
-            "Returns: share_date, publish_date, pay_date, record_date, dps."
+            "Returns: share_date, publish_date, pay_date, record_date, dps, and a pagination_key."
         ),
         annotations={"readOnlyHint": True},
     )
     async def get_fund_dividends(
         symbol: str,
         category: str = "US_STOCK",
-        page_index: Optional[int] = None,
-        page_size: Optional[int] = None,
+        pagination_key: Optional[str] = None,
     ) -> str:
         """Get fund dividends.
 
         Args:
             symbol: Fund symbol (e.g. QQQ).
             category: Security type.
-            page_index: Page number starting from 1 (default 1).
-            page_size: Records per page (default 10, max 20).
+            pagination_key: Pagination key from the previous page response;
+                not returned on the last page.
         """
         audit.log_tool_call("get_fund_dividends", {"symbol": symbol})
         try:
             data = extract_response_data(
-                sdk.data.fundamentals.get_fund_dividends(
+                sdk.data.fundamentals.list_fund_dividends(
                     symbol=symbol, category=category,
-                    page_index=page_index, page_size=page_size,
+                    pagination_key=pagination_key,
                 )
             )
             return prepend_disclaimer(format_fund_dividends(data))

@@ -218,13 +218,13 @@ def register_stock_market_data_tools(
         audit.log_tool_call("get_stock_bars_single", {"symbol": symbol})
         try:
             kwargs = _build_kwargs(
-                {"symbol": symbol, "category": category, "timespan": timespan, "count": str(count)},
+                {"symbols": [symbol], "category": category, "timespan": timespan, "count": str(count)},
                 real_time_required=real_time_required,
                 trading_sessions=trading_sessions,
                 start_time=start_time,
                 end_time=end_time,
             )
-            data = extract_response_data(sdk.data.market_data.get_history_bar(**kwargs))
+            data = extract_response_data(sdk.data.market_data.get_batch_history_bar(**kwargs))
             return prepend_disclaimer(format_stock_bars(data))
         except Exception as e:
             return handle_sdk_exception(e, "get_stock_bars_single", config.region_id)

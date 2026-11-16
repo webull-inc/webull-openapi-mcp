@@ -113,6 +113,7 @@ def register_event_market_data_tools(
     @mcp.tool(
         description=(
             "Get event contract OHLCV bars. "
+            "start_time/end_time: optional range as timestamps in milliseconds. "
             "Returns: time, open, high, low, close, volume."
         ),
         annotations={"readOnlyHint": True},
@@ -123,8 +124,15 @@ def register_event_market_data_tools(
         timespan: str = "D",
         count: int = 200,
         real_time_required: bool = False,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
     ) -> str:
-        """Fetch historical OHLCV bar data for event contracts."""
+        """Fetch historical OHLCV bar data for event contracts.
+
+        Args:
+            start_time: Start timestamp in milliseconds (optional).
+            end_time: End timestamp in milliseconds (optional).
+        """
         audit.log_tool_call("get_event_bars", {"symbols": symbols})
         try:
             sym_list = [s.strip() for s in symbols.split(",") if s.strip()]
@@ -132,6 +140,8 @@ def register_event_market_data_tools(
                 {"symbols": sym_list, "timespan": timespan, "category": category},
                 count=count if count != 200 else None,
                 real_time_required=real_time_required,
+                start_time=start_time,
+                end_time=end_time,
             )
             data = extract_response_data(sdk.data.event_market_data.get_event_bars(**kwargs))
             return prepend_disclaimer(format_event_bars(data))

@@ -404,6 +404,24 @@ All commands accept `--env-file PATH` to specify a custom `.env` file location (
 
 ---
 
+## Migration Notes (1.2.7)
+
+This release moves the tool calls to the latest API paths and removes the old paging parameters without a compatibility layer. Clients that still send a removed parameter get a validation error (unexpected argument).
+
+| Tool | Removed parameters | Use instead |
+|------|--------------------|-------------|
+| `get_instruments`, `get_crypto_instruments`, `get_event_instruments` | `page_size`, `last_instrument_id` | `pagination_key` |
+| `get_event_series` | `page_size`, `last_series_id` | `pagination_key` |
+| `get_market_sectors`, `get_market_sectors_detail`, `get_fund_dividends` | `page_size`, `page_index` | `pagination_key` |
+| `get_gainers_losers`, `get_most_active`, `get_high_dividend`, `get_52_week_high_low` | `page_size`, `page_index` | None. These endpoints return a single result set without paging |
+
+Paged tools print `Next pagination_key: ...` when more data is available. Pass that value as `pagination_key` to get the next page; the last page has no key.
+
+Other changes:
+
+- `get_option_bars`, `get_futures_bars`, `get_crypto_bars` and `get_event_bars` accept optional `start_time` and `end_time` (milliseconds).
+- `get_stock_bars_single` now calls the batch bars endpoint, and the output groups rows under a `--- SYMBOL ---` header.
+
 ## Security
 
 - **Never share your AK/SK with AI models** — Do not paste your App Key or App Secret into chat prompts, AI assistants, or any LLM conversation. These credentials should only be configured via environment variables or `.env` files, never exposed in plain text to the model.

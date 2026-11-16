@@ -49,29 +49,26 @@ def test_returns_no_data_for_empty_list(fn):
 
 class TestFormatGainersLosers:
     def test_formats_data_list(self):
-        data = {
-            "has_more": True,
-            "data": [
-                {
-                    "symbol": "TSLA",
-                    "name": "Tesla Inc",
-                    "price": "250.00",
-                    "pre_close": "235.00",
-                    "open": "236.00",
-                    "high": "252.00",
-                    "low": "234.00",
-                    "close": "250.00",
-                    "change": "15.00",
-                    "change_ratio": "0.064",
-                    "amplitude": "0.0766",
-                    "volume": "5000000",
-                    "turnover_rate": "0.005",
-                    "market_value": "800000000000",
-                    "exchange_code": "NAS",
-                    "currency_code": "USD",
-                },
-            ],
-        }
+        data = [
+            {
+                "symbol": "TSLA",
+                "name": "Tesla Inc",
+                "price": "250.00",
+                "pre_close": "235.00",
+                "open": "236.00",
+                "high": "252.00",
+                "low": "234.00",
+                "close": "250.00",
+                "change": "15.00",
+                "change_ratio": "0.064",
+                "amplitude": "0.0766",
+                "volume": "5000000",
+                "turnover_rate": "0.005",
+                "market_value": "800000000000",
+                "exchange_code": "NAS",
+                "currency_code": "USD",
+            },
+        ]
         result = format_gainers_losers(data)
         assert "Gainers / Losers" in result
         assert "TSLA" in result
@@ -81,17 +78,11 @@ class TestFormatGainersLosers:
         assert "0.064" in result
         assert "0.0766" in result
         assert "NAS" in result
-        assert "More results available" in result
-
-    def test_no_has_more(self):
-        data = {"has_more": False, "data": [{"symbol": "X", "name": "Test"}]}
-        result = format_gainers_losers(data)
         assert "More results available" not in result
 
+
     def test_empty_data_list(self):
-        data = {"has_more": False, "data": []}
-        result = format_gainers_losers(data)
-        assert result == _NO_DATA
+        assert format_gainers_losers([]) == _NO_DATA
 
 
 # ---------------------------------------------------------------------------
@@ -100,30 +91,27 @@ class TestFormatGainersLosers:
 
 class TestFormatMostActive:
     def test_formats_with_relative_volume(self):
-        data = {
-            "has_more": False,
-            "data": [
-                {
-                    "symbol": "AAPL",
-                    "name": "Apple Inc",
-                    "price": "290.00",
-                    "pre_close": "285.00",
-                    "open": "286.00",
-                    "high": "291.00",
-                    "low": "284.00",
-                    "close": "290.00",
-                    "change": "5.00",
-                    "change_ratio": "0.018",
-                    "amplitude": "0.0246",
-                    "volume": "80000000",
-                    "turnover_rate": "0.005",
-                    "market_value": "4500000000000",
-                    "exchange_code": "NAS",
-                    "currency_code": "USD",
-                    "relative_volume_10d": "2.35",
-                },
-            ],
-        }
+        data = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple Inc",
+                "price": "290.00",
+                "pre_close": "285.00",
+                "open": "286.00",
+                "high": "291.00",
+                "low": "284.00",
+                "close": "290.00",
+                "change": "5.00",
+                "change_ratio": "0.018",
+                "amplitude": "0.0246",
+                "volume": "80000000",
+                "turnover_rate": "0.005",
+                "market_value": "4500000000000",
+                "exchange_code": "NAS",
+                "currency_code": "USD",
+                "relative_volume_10d": "2.35",
+            },
+        ]
         result = format_most_active(data)
         assert "Most Active" in result
         assert "AAPL" in result
