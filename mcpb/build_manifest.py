@@ -47,23 +47,18 @@ def detect_python_requires(override: str | None) -> str:
 
 
 def _tool_entry_from_dict(t: dict) -> dict:
-    """Normalize a tool dict, guaranteeing an object-typed inputSchema.
+    """Normalize a tool dict to {name, description}.
 
-    Smithery's release validation requires every tool to carry an inputSchema
-    object, so we never emit a tool without one.
+    The MCPB packer only allows name/description; inputSchema is rejected.
     """
     entry: dict = {"name": t["name"]}
     if t.get("description"):
         entry["description"] = str(t["description"]).strip()
-    schema = t.get("inputSchema")
-    if not isinstance(schema, dict):
-        schema = {"type": "object", "properties": {}}
-    entry["inputSchema"] = schema
     return entry
 
 
 def load_tools(tools_path: str | None) -> list[dict]:
-    """Load full tool definitions (incl. inputSchema) from JSON or the package."""
+    """Load tool definitions (name/description) from JSON or the package."""
     if tools_path:
         data = json.loads(Path(tools_path).read_text(encoding="utf-8"))
         return [_tool_entry_from_dict(t) for t in data]
@@ -77,40 +72,15 @@ def load_tools(tools_path: str | None) -> list[dict]:
     tools = asyncio.run(server.list_tools())
 
     def convert(ft) -> dict:
-        # FastMCP FunctionTool -> canonical MCP Tool (exposes inputSchema).
+        # FastMCP FunctionTool -> canonical MCP Tool.
         d = ft.to_mcp_tool().model_dump(by_alias=True, exclude_none=True)
         return _tool_entry_from_dict(d)
 
     return sorted((convert(t) for t in tools), key=lambda d: d["name"])
 
 
-def _project_tools(tools: list[dict], include_input_schema: bool) -> list[dict]:
-    """Shape the tools array per target.
-
-    - mcpb pack (Claude Desktop / MCPB spec): only {name, description} are
-      allowed; inputSchema is rejected by the packer.
-    - Smithery: each tool MUST carry an inputSchema object.
-    """
-    out: list[dict] = []
-    for t in tools:
-        entry: dict = {"name": t["name"]}
-        if t.get("description"):
-            entry["description"] = t["description"]
-        if include_input_schema:
-            schema = t.get("inputSchema")
-            entry["inputSchema"] = schema if isinstance(schema, dict) else {"type": "object", "properties": {}}
-        out.append(entry)
-    return out
-
-
-def build_manifest(
-    version: str,
-    python_requires: str,
-    tools: list[dict],
-    include_input_schema: bool = False,
-) -> dict:
+def build_manifest(version: str, python_requires: str, tools: list[dict]) -> dict:
     """Assemble the manifest dictionary."""
-    tools = _project_tools(tools, include_input_schema)
     return {
         "manifest_version": "0.4",
         "name": "webull-openapi-mcp",
@@ -147,10 +117,8 @@ def build_manifest(
         "keywords": ["webull", "trading", "market-data", "finance", "stocks", "openapi"],
         "privacy_policies": ["https://www.webull.com/policy"],
         "server": {
-            # NOTE: declared as "python" (not "uv") for cross-host compatibility.
-            # Smithery's publish CLI only recognizes node/python/binary/bun and
-            # rejects type "uv". Execution still goes through `uv run` below, so
-            # `uv` must be available at runtime on the user's machine.
+            # NOTE: declared as "python"; execution goes through `uv run` below,
+            # so `uv` must be available at runtime on the user's machine.
             "type": "python",
             "entry_point": "src/server.py",
             "mcp_config": {
@@ -265,13 +233,6 @@ def main() -> None:
     parser.add_argument("--version", default=None, help="Override the bundle version")
     parser.add_argument("--python-requires", default=None, help="Override the Python constraint")
     parser.add_argument("--out", default="manifest.json", help="Output manifest path")
-    parser.add_argument(
-        "--target",
-        choices=["mcpb", "smithery"],
-        default="mcpb",
-        help="mcpb: tools without inputSchema (packable by mcpb / Claude Desktop). "
-        "smithery: tools with inputSchema (required by Smithery).",
-    )
     parser.add_argument("--no-pyproject", action="store_true", help="Do not regenerate pyproject.toml")
     args = parser.parse_args()
 
@@ -279,13 +240,12 @@ def main() -> None:
     python_requires = detect_python_requires(args.python_requires)
     tools = load_tools(args.tools)
 
-    include_input_schema = args.target == "smithery"
-    manifest = build_manifest(version, python_requires, tools, include_input_schema)
+    manifest = build_manifest(version, python_requires, tools)
     out_path = Path(args.out)
     out_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(
-        f"Wrote {out_path}: target={args.target}, version={version}, "
-        f"python={python_requires}, tools={len(tools)}, inputSchema={include_input_schema}"
+        f"Wrote {out_path}: version={version}, "
+        f"python={python_requires}, tools={len(tools)}"
     )
 
     if not args.no_pyproject:

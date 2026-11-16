@@ -15,10 +15,8 @@ permissions:
 
 env:
   # Pin third-party CLIs so an upstream release cannot break the pipeline.
-  SMITHERY_VERSION: '1.2.0'
   # mcp-publisher: set to a release tag (e.g. v1.0.0) to pin; 'latest' otherwise.
   MCP_PUBLISHER_REF: 'latest'
-  SMITHERY_TARGET: 'webull/webull-openapi-mcp'   # <namespace>/<server-id>
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -157,8 +155,8 @@ jobs:
         run: ./mcp-publisher publish
 
   # ---------------------------------------------------------------------------
-  # 4) Build the MCPB bundles from the published PyPI release.
-  #    Emits both bundles as an artifact for the distribution jobs.
+  # 4) Build the MCPB bundle from the published PyPI release.
+  #    Emits the bundle as an artifact for the release job.
   # ---------------------------------------------------------------------------
   build-mcpb:
     needs: [verify, publish-pypi]
@@ -189,18 +187,16 @@ jobs:
           done
           echo "::error::Timed out waiting for PyPI to serve $VERSION"; exit 1
 
-      - name: Build .mcpb bundles
+      - name: Build .mcpb bundle
         run: |
           chmod +x mcpb/build.sh
           PYTHON=python ./mcpb/build.sh "${{ needs.verify.outputs.version }}"
 
-      - name: Upload MCPB bundles
+      - name: Upload MCPB bundle
         uses: actions/upload-artifact@v4
         with:
           name: mcpb-bundles
-          path: |
-            mcpb/webull-openapi-mcp.mcpb
-            mcpb/webull-openapi-mcp.smithery.mcpb
+          path: mcpb/webull-openapi-mcp.mcpb
           retention-days: 7
 
   # ---------------------------------------------------------------------------
@@ -229,34 +225,5 @@ jobs:
           else
             gh release create "$TAG" mcpb/webull-openapi-mcp.mcpb \
               --title "$TAG" \
-              --notes "Webull OpenAPI MCP .mcpb bundle ($TAG). Install in Claude Desktop by double-clicking the file, or via Smithery."
+              --notes "Webull OpenAPI MCP .mcpb bundle ($TAG). Install in Claude Desktop by double-clicking the file."
           fi
-
-  # ---------------------------------------------------------------------------
-  # 6) Publish the Smithery bundle. Skipped until SMITHERY_API_KEY is set.
-  #    NOTE: verify auth on first run — if the CLI does not pick up
-  #    SMITHERY_API_KEY, add a `smithery auth login` with the token first.
-  # ---------------------------------------------------------------------------
-  publish-smithery:
-    needs: build-mcpb
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
-    steps:
-      - name: Download MCPB bundles
-        uses: actions/download-artifact@v4
-        with:
-          name: mcpb-bundles
-          path: mcpb/
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Publish to Smithery
-        if: ${{ env.SMITHERY_API_KEY != '' }}
-        run: |
-          npx -y "smithery@${SMITHERY_VERSION}" mcp publish ./mcpb/webull-openapi-mcp.smithery.mcpb -n "$SMITHERY_TARGET"
