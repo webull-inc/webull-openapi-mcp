@@ -364,3 +364,17 @@ class TestFormatPlaceOptionOrderResult:
         result = format_place_option_order_result(data)
         assert "OPT1" in result
         assert "Option" in result
+
+
+def test_au_disclaimer_applies_to_au_only():
+    """The AU disclaimer is used for AU; other regions keep the generic text."""
+    from webull_openapi_mcp import formatters
+
+    try:
+        formatters.set_disclaimer_region("au")
+        assert "technical integration only, not financial advice" in formatters.prepend_disclaimer("x")
+        formatters.set_disclaimer_region("us")
+        assert "technical integration only" not in formatters.prepend_disclaimer("x")
+        assert "for reference only" in formatters.prepend_disclaimer("x")
+    finally:
+        formatters.set_disclaimer_region("us")

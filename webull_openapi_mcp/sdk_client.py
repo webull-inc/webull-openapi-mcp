@@ -28,6 +28,7 @@ _2FA_GUIDE_LINKS: dict[str, str] = {
     "uk": "https://developer.webull-uk.com/apis/docs/authentication/token",
     "us": "https://developer.webull.com/apis/docs/authentication/token",
     "za": "https://developer.webull.co.za/apis/docs/authentication/token",
+    "au": "https://developer.webull.com.au/apis/docs/authentication/token",
 }
 
 
@@ -139,7 +140,7 @@ class DeviceNotRegisteredError(Exception):
 # based on each request's api_type - no add_endpoint() calls needed.
 UAT_ENDPOINTS: dict = {
     "default_region": "us",
-    "regions": ["us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br", "za"],
+    "regions": ["us", "hk", "jp", "sg", "th", "my", "uk", "mx", "br", "za", "au"],
     "region_mapping": {
         "us": {
             "api": "api.sandbox.webull.com",
@@ -187,6 +188,11 @@ UAT_ENDPOINTS: dict = {
             "events-api": "us-openapi-events.uat.webullbroker.com",
         },
         "za": {
+            "api": "au-api.uat.webullbroker.com",
+            "quotes-api": "au-api.uat.webullbroker.com",
+            "events-api": "au-events-api.uat.webullbroker.com",
+        },
+        "au": {
             "api": "au-api.uat.webullbroker.com",
             "quotes-api": "au-api.uat.webullbroker.com",
             "events-api": "au-events-api.uat.webullbroker.com",

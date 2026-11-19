@@ -10,6 +10,8 @@ Webull MCP Server provides information solely for reference purposes. Nothing co
 
 Webull MCP Server is a technical integration tool designed to enable AI assistants to interact with Webull OpenAPI. It does not provide investment recommendations, financial planning services, tax or legal advice, or any form of guarantee regarding trading outcomes. Users should not rely on this tool as a substitute for professional financial or legal consultation.
 
+**Australia (AU) region:** Webull MCP Server offers technical integration only, not financial advice. AI outputs may be inaccurate or trigger unintended trades. You are responsible for monitoring activity. Webull is not responsible for the independent actions of third-party AI tools to the extent permitted by law.
+
 ## 3. Risk Warning
 
 Trading in securities, options, cryptocurrencies, and other financial instruments ("Financial Services") involves a high degree of risk and may result in significant losses. Financial Services are provided by Webull affiliates and such services are not suitable for all investors. Users should ensure that any funds allocated to trading are not required for essential living expenses, and users must recognize the possibility of losing the entire investment. Before engaging in trading, users should fully understand the risks associated with each type of investment, carefully evaluate their investment objectives, level of experience, and risk tolerance, and, where appropriate, seek independent professional advice.
