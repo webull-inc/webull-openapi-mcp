@@ -24,7 +24,6 @@ cd "${SCRIPT_DIR}"
 PYTHON="${PYTHON:-python3}"
 MCPB="${MCPB:-npx -y @anthropic-ai/mcpb}"
 OUTPUT="webull-openapi-mcp.mcpb"
-SMITHERY_OUTPUT="webull-openapi-mcp.smithery.mcpb"
 
 # Resolve the version to build: explicit arg, else the repo's declared version.
 # Extract the first semver-looking token from __init__.py (avoids fragile quote
@@ -68,16 +67,11 @@ tools = asyncio.run(server.list_tools())
 
 
 def convert(ft):
-    # FastMCP FunctionTool -> canonical MCP Tool (exposes inputSchema),
-    # which Smithery's release validation requires for every tool.
+    # FastMCP FunctionTool -> canonical MCP Tool; keep only name/description.
     d = ft.to_mcp_tool().model_dump(by_alias=True, exclude_none=True)
     entry = {"name": d["name"]}
     if d.get("description"):
         entry["description"] = d["description"].strip()
-    schema = d.get("inputSchema")
-    if not isinstance(schema, dict):
-        schema = {"type": "object", "properties": {}}
-    entry["inputSchema"] = schema
     return entry
 
 
@@ -87,31 +81,12 @@ with open(sys.argv[1], "w", encoding="utf-8") as f:
 print(f"   extracted {len(data)} tools", file=sys.stderr)
 PY
 
-# ---- Claude Desktop / MCPB bundle (packed by mcpb; tools without inputSchema) ----
-echo ">> Regenerating manifest.json + pyproject.toml (mcpb target)"
-"${VENV_PY}" build_manifest.py --tools "${TOOLS_JSON}" --target mcpb
+# ---- Claude Desktop / MCPB bundle ----
+echo ">> Regenerating manifest.json + pyproject.toml"
+"${VENV_PY}" build_manifest.py --tools "${TOOLS_JSON}"
 
 echo ">> Packing ${OUTPUT} (Claude Desktop / GitHub Release)"
 ${MCPB} pack . "${OUTPUT}"
 
-# ---- Smithery bundle (manual zip; tools WITH inputSchema, required by Smithery) ----
-echo ">> Building ${SMITHERY_OUTPUT} (Smithery)"
-SMITHERY_MANIFEST="$(mktemp)"
-"${VENV_PY}" build_manifest.py --tools "${TOOLS_JSON}" --target smithery --out "${SMITHERY_MANIFEST}" --no-pyproject
-SMITHERY_MANIFEST="${SMITHERY_MANIFEST}" SMITHERY_OUTPUT="${SMITHERY_OUTPUT}" "${VENV_PY}" - <<'PY'
-import os, zipfile
-manifest = os.environ["SMITHERY_MANIFEST"]
-out = os.environ["SMITHERY_OUTPUT"]
-# Mirror exactly what mcpb pack includes, but swap in the Smithery manifest.
-files = ["pyproject.toml", "src/server.py"]
-with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-    z.write(manifest, "manifest.json")
-    for f in files:
-        z.write(f, f)
-print(f"   wrote {out}")
-PY
-rm -f "${SMITHERY_MANIFEST}"
-
 echo ">> Done:"
-echo "   ${SCRIPT_DIR}/${OUTPUT}           -> Claude Desktop (double-click) / GitHub Release"
-echo "   ${SCRIPT_DIR}/${SMITHERY_OUTPUT}  -> Smithery: smithery mcp publish ./${SMITHERY_OUTPUT} -n <org>/<server>"
+echo "   ${SCRIPT_DIR}/${OUTPUT}  -> Claude Desktop (double-click) / GitHub Release"

@@ -24,6 +24,8 @@ VALID_ENTRUST_TYPES: frozenset[str] = frozenset({"QTY", "AMOUNT"})
 # JP account tax types
 VALID_ACCOUNT_TAX_TYPES: frozenset[str] = frozenset({"GENERAL", "SPECIFIC"})
 
+# JP trade currencies (settlement currency of stock orders)
+VALID_TRADE_CURRENCIES: frozenset[str] = frozenset({"USD", "JPY"})
 # JP margin types
 VALID_MARGIN_TYPES: frozenset[str] = frozenset({"ONE_DAY", "INDEFINITE"})
 

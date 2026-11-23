@@ -432,7 +432,7 @@ Other changes:
 - **Review before trading** — Always review order details proposed by the AI before confirming. Use `preview_stock_order` / `preview_option_order` before placing orders.
 - **Use toolset filtering** — Set `WEBULL_TOOLSETS=account,market-data` to disable trading tools entirely if you only need read-only access. Valid toolsets: `account`, `market-data`, `trading`, `instrument`.
 - **Default sandbox** — The server defaults to UAT (sandbox) environment. You must explicitly set `WEBULL_ENVIRONMENT=prod` for live trading.
-- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `3.0.4`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
+- **Dependency security** — `fastmcp` is pinned to version `3.0.2` and `webull-openapi-python-sdk` is pinned to `3.1.1`. Users are responsible for monitoring and updating third-party dependencies for security patches. Review release notes before upgrading.
 
 ---
 

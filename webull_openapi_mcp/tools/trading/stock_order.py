@@ -45,6 +45,7 @@ if TYPE_CHECKING:
 
 AccountTaxType = Literal["GENERAL", "SPECIFIC"]
 MarginType = Literal["ONE_DAY", "INDEFINITE"]
+TradeCurrency = Literal["USD", "JPY"]
 PositionIntent = Literal[
     "BUY_TO_OPEN",
     "BUY_TO_CLOSE",
@@ -125,6 +126,7 @@ def _build_stock_order(params: dict) -> dict:
     _add_optional_str(order, "expire_date", params.get("expire_date"))
     _add_optional_str(order, "account_tax_type", params.get("account_tax_type"))
     _add_optional_str(order, "margin_type", params.get("margin_type"))
+    _add_optional_str(order, "trade_currency", params.get("trade_currency"))
     _add_optional_str(order, "position_intent", params.get("position_intent"))
     if params.get("close_contracts") is not None:
         order["close_contracts"] = params["close_contracts"]
@@ -152,6 +154,7 @@ def _build_preview_stock_order(params: dict) -> dict:
         "stop_price": params.get("stop_price"),
         "account_tax_type": params.get("account_tax_type"),
         "margin_type": params.get("margin_type"),
+        "trade_currency": params.get("trade_currency"),
         "close_contracts": params.get("close_contracts"),
     })
 
@@ -449,6 +452,7 @@ def register_stock_order_tools(
             "JP (WEBULL_REGION_ID=jp, including US orders): "
             "account_tax_type is REQUIRED and must be GENERAL or SPECIFIC; "
             "margin_type must be ONE_DAY or INDEFINITE and is margin-account-only; "
+            "trade_currency (USD or JPY) is the settlement currency, required for CASH accounts and optional for MARGIN accounts; "
             "position_intent must be BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, or SELL_TO_CLOSE and is margin-account-only; "
             "close_contracts account eligibility is checked by the API backend.\n"
             "Leg-in / leg-out (US only): use to leg a STOCK leg into/out of an option combo position. "
@@ -478,6 +482,7 @@ def register_stock_order_tools(
         expire_date: Optional[str] = None,
         account_tax_type: Optional[AccountTaxType] = None,
         margin_type: Optional[MarginType] = None,
+        trade_currency: Optional[TradeCurrency] = None,
         position_intent: Optional[PositionIntent] = None,
         close_contracts: Optional[list[dict]] = None,
         leg_in_or_out: Optional[str] = None,
@@ -492,6 +497,7 @@ def register_stock_order_tools(
             expire_date: GTD order expire date, format yyyy-MM-dd. Required when time_in_force=GTD.
             account_tax_type: REQUIRED for JP region. Must be GENERAL or SPECIFIC.
             margin_type: JP margin-account-only. ONE_DAY or INDEFINITE.
+            trade_currency: JP only. Settlement currency of the order, USD or JPY. Required for CASH accounts, optional for MARGIN accounts.
             position_intent: JP margin-account-only. BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, or SELL_TO_CLOSE.
             close_contracts: JP only. List of contracts to close, each with contract_id and quantity.
         """
@@ -513,7 +519,8 @@ def register_stock_order_tools(
             "time_in_force": time_in_force, "quantity": quantity,
             "entrust_type": entrust_type, "trading_session": trading_session,
             "market": market, "account_tax_type": account_tax_type,
-            "margin_type": margin_type, "position_intent": position_intent,
+            "margin_type": margin_type, "trade_currency": trade_currency,
+            "position_intent": position_intent,
             "close_contracts": close_contracts,
         }
         if limit_price is not None:
@@ -576,6 +583,7 @@ def register_stock_order_tools(
             "expire_date": expire_date,
             "account_tax_type": account_tax_type,
             "margin_type": margin_type,
+            "trade_currency": trade_currency,
             "position_intent": position_intent,
             "close_contracts": close_contracts,
             "leg_in_or_out": leg_in_or_out,
@@ -610,6 +618,7 @@ def register_stock_order_tools(
             "Account: stock/option account (Individual Cash, Individual Margin, IRA).\n"
             "JP (WEBULL_REGION_ID=jp, including US orders): account_tax_type is REQUIRED and must be GENERAL or SPECIFIC; "
             "margin_type must be ONE_DAY or INDEFINITE and is margin-account-only; "
+            "trade_currency (USD or JPY) is the settlement currency, required for CASH accounts and optional for MARGIN accounts; "
             "close_contracts account eligibility is checked by the API backend."
         ),
     )
@@ -626,6 +635,7 @@ def register_stock_order_tools(
         trading_session: str = "CORE",
         account_tax_type: Optional[AccountTaxType] = None,
         margin_type: Optional[MarginType] = None,
+        trade_currency: Optional[TradeCurrency] = None,
         close_contracts: Optional[list[dict]] = None,
     ) -> str:
         """Preview a stock order without submitting."""
@@ -641,7 +651,8 @@ def register_stock_order_tools(
             "time_in_force": time_in_force, "quantity": quantity,
             "entrust_type": "QTY", "trading_session": trading_session,
             "market": market, "account_tax_type": account_tax_type,
-            "margin_type": margin_type, "close_contracts": close_contracts,
+            "margin_type": margin_type, "trade_currency": trade_currency,
+            "close_contracts": close_contracts,
         }
         if limit_price is not None:
             params["limit_price"] = limit_price
@@ -680,6 +691,7 @@ def register_stock_order_tools(
             "stop_price": stop_price,
             "account_tax_type": account_tax_type,
             "margin_type": margin_type,
+            "trade_currency": trade_currency,
             "close_contracts": close_contracts,
         })
 

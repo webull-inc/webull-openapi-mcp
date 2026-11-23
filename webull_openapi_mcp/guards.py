@@ -24,6 +24,7 @@ from webull_openapi_mcp.constants import (
     VALID_OPTION_TYPES,
     VALID_POSITION_INTENTS,
     VALID_SIDES,
+    VALID_TRADE_CURRENCIES,
 )
 from webull_openapi_mcp.errors import (
     FeatureNotSupportedError,
@@ -639,6 +640,12 @@ class OrderValidator:
                 field="margin_type",
             )
 
+        trade_currency = params.get("trade_currency")
+        if trade_currency is not None and trade_currency not in VALID_TRADE_CURRENCIES:
+            raise ValidationError(
+                f"Invalid trade_currency, must be one of {sorted(VALID_TRADE_CURRENCIES)}",
+                field="trade_currency",
+            )
         validate_close_contracts(params.get("close_contracts"))
 
     # =========================================================================
