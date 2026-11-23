@@ -76,6 +76,14 @@ _DISCLAIMER_UK = (
     "Trading involves risk; please make decisions carefully.\n\n"
 )
 
+_DISCLAIMER_AU = (
+    "⚠ Disclaimer: "
+    "Webull MCP Server offers technical integration only, not financial advice. "
+    "AI outputs may be inaccurate or trigger unintended trades. "
+    "You are responsible for monitoring activity. "
+    "Webull is not responsible for the independent actions of third-party AI tools "
+    "to the extent permitted by law.\n\n"
+)
 # Default (backward compatibility)
 DISCLAIMER = _DISCLAIMER_US
 
@@ -99,6 +107,8 @@ def set_disclaimer_region(region_id: str) -> None:
         DISCLAIMER = _DISCLAIMER_MY
     elif _current_region == "uk":
         DISCLAIMER = _DISCLAIMER_UK
+    elif _current_region == "au":
+        DISCLAIMER = _DISCLAIMER_AU
     else:
         DISCLAIMER = _DISCLAIMER_US
 

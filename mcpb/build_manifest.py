@@ -194,7 +194,7 @@ def build_manifest(
             "region_id": {
                 "type": "string",
                 "title": "Region",
-                "description": "Webull region: us, hk, jp, sg, th, my, uk, mx, br, or za.",
+                "description": "Webull region: us, hk, jp, sg, th, my, uk, mx, br, za, or au.",
                 "default": "us",
                 "required": True,
             },

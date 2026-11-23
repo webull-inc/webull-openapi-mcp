@@ -301,6 +301,14 @@ def test_th_registered_and_eu_deferred():
         get_region_config("eu")
 
 
+def test_au_registered_stocks_only():
+    """AU is a supported region for US stocks/ETFs only (no options)."""
+    from webull_openapi_mcp.region_config import SUPPORTED_REGIONS, get_region_config
+    assert "au" in SUPPORTED_REGIONS
+    au = get_region_config("au")
+    assert au.supports_options is False
+    assert au.valid_instrument_categories == frozenset({"US_STOCK", "US_ETF"})
+    assert "eu" not in SUPPORTED_REGIONS
 def _schema_types(schema: dict) -> set[str]:
     """Extract JSON Schema types from either a direct type or anyOf schema."""
     types: set[str] = set()
